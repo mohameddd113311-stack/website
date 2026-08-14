@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Cairo } from 'next/font/google';
 import './globals.css';
 import Header from '@/components/Header';
@@ -17,7 +17,12 @@ export const metadata: Metadata = {
   description: 'المتجر الأول في الوطن العربي لاشتراكات الذكاء الاصطناعي الرسمية (Gemini Pro, ChatGPT Plus, CapCut Pro) بأسرع تفعيل وتواصل مباشر عبر الواتساب.',
   keywords: ['AI Studio', 'اشتراك Gemini Pro', 'اشتراك ChatGPT Plus', 'اشتراك CapCut Pro', 'ذكاء اصطناعي', 'متجر اشتراكات'],
   authors: [{ name: 'AI Studio Team' }],
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
