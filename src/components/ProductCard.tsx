@@ -3,19 +3,34 @@
 import React from 'react';
 import { Product } from '@/lib/products';
 import { Check, MessageCircle, Sparkles, Cpu, Video, Flame } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
 
 interface ProductCardProps {
   product: Product;
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
+  const { lang, currency, formatPrice, t } = useApp();
   const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201000000000';
-  
-  const defaultMsg = `مرحباً AI Studio، أريد شراء اشتراك [${product.name}] بسعر ${product.price}$ (${product.billingPeriod})`;
-  const finalMsg = product.whatsappMsg || defaultMsg;
+
+  const formattedPrice = formatPrice(product.price);
+  const formattedOriginalPrice = product.originalPrice ? formatPrice(product.originalPrice) : null;
+
+  const translatedPeriod =
+    product.billingPeriod === 'شهرياً' || product.billingPeriod === 'monthly'
+      ? t.productCard.monthly
+      : product.billingPeriod === 'سنوياً' || product.billingPeriod === 'yearly'
+      ? t.productCard.yearly
+      : product.billingPeriod;
+
+  // WhatsApp Message formatted according to language & selected currency
+  const finalMsg = lang === 'ar'
+    ? `مرحباً AI Studio، أريد شراء اشتراك [${product.name}] بسعر ${formattedPrice} (${translatedPeriod})`
+    : `Hello AI Studio, I would like to subscribe to [${product.name}] for ${formattedPrice} (${translatedPeriod})`;
+
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(finalMsg)}`;
 
-  // Render product icon / banner graphic
+  // Render product graphic
   const renderProductGraphic = () => {
     if (product.imageUrl) {
       return (
@@ -84,7 +99,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     >
       {/* Popular Badge */}
       {product.badge && (
-        <div className="absolute -top-3.5 right-6 z-20">
+        <div className={`absolute -top-3.5 ${lang === 'ar' ? 'right-6' : 'left-6'} z-20`}>
           <span className="px-3.5 py-1 rounded-full text-xs font-extrabold bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg flex items-center gap-1.5 border border-white/20">
             <Flame className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
             <span>{product.badge}</span>
@@ -109,16 +124,16 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         {/* Price Tag */}
         <div className="mb-6 pb-6 border-b border-slate-800/80 flex items-baseline gap-2">
-          <span className="text-3xl font-extrabold text-white">${product.price}</span>
-          {product.originalPrice && (
-            <span className="text-sm text-slate-500 line-through">${product.originalPrice}</span>
+          <span className="text-3xl font-extrabold text-white">{formattedPrice}</span>
+          {formattedOriginalPrice && (
+            <span className="text-sm text-slate-500 line-through">{formattedOriginalPrice}</span>
           )}
-          <span className="text-xs text-slate-400 font-medium">/ {product.billingPeriod}</span>
+          <span className="text-xs text-slate-400 font-medium">/ {translatedPeriod}</span>
         </div>
 
         {/* Features list */}
         <div className="space-y-3 mb-8">
-          <div className="text-xs font-bold text-slate-300 mb-1">مميزات الاشتراك:</div>
+          <div className="text-xs font-bold text-slate-300 mb-1">{t.productCard.featuresTitle}</div>
           {product.features.map((feature, idx) => (
             <div key={idx} className="flex items-start gap-2.5 text-xs text-slate-300">
               <div className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-400 mt-0.5 shrink-0">
@@ -138,7 +153,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         className="w-full btn-whatsapp-glow py-3.5 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 group/btn"
       >
         <MessageCircle className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
-        <span>شراء الآن عبر الواتساب</span>
+        <span>{t.productCard.buyBtn}</span>
       </a>
     </div>
   );

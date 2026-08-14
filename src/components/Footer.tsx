@@ -3,11 +3,18 @@
 import React from 'react';
 import Link from 'next/link';
 import { Sparkles, Facebook, MessageCircle, ShieldCheck } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
 
 export default function Footer() {
+  const { lang, t } = useApp();
   const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201000000000';
   const facebookUrl = process.env.NEXT_PUBLIC_FACEBOOK_URL || 'https://facebook.com';
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent('مرحباً AI Studio')}`;
+  
+  const whatsappMsg = lang === 'ar'
+    ? 'مرحباً AI Studio'
+    : 'Hello AI Studio';
+    
+  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMsg)}`;
 
   return (
     <footer className="bg-dark-bg border-t border-slate-800/80 pt-16 pb-12 relative overflow-hidden">
@@ -27,7 +34,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-slate-400 text-sm leading-relaxed max-w-md">
-              متجرك الرائد والأول للحصول على اشتراكات الذكاء الاصطناعي الرسمية بأعلى جودة، وأسرع تفعيل، وأفضل أسعار في العالم العربي.
+              {t.footer.desc}
             </p>
             <div className="flex items-center gap-3 pt-2">
               <a
@@ -35,7 +42,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-9 h-9 rounded-xl glass-card border border-slate-800 flex items-center justify-center text-slate-300 hover:text-blue-400 hover:border-blue-500/40 transition-all"
-                title="صفحتنا على فيسبوك"
+                title={t.nav.facebookPage}
               >
                 <Facebook className="w-4.5 h-4.5" />
               </a>
@@ -44,7 +51,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-9 h-9 rounded-xl glass-card border border-slate-800 flex items-center justify-center text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40 transition-all"
-                title="تواصل واتساب"
+                title={t.footer.whatsappContact}
               >
                 <MessageCircle className="w-4.5 h-4.5" />
               </a>
@@ -53,33 +60,33 @@ export default function Footer() {
 
           {/* Quick Links */}
           <div className="space-y-3">
-            <h4 className="text-sm font-bold text-white tracking-wider">روابط السريعة</h4>
+            <h4 className="text-sm font-bold text-white tracking-wider">{t.footer.quickLinks}</h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li><a href="#hero" className="hover:text-cyan-400 transition-colors">الرئيسية</a></li>
-              <li><a href="#products" className="hover:text-cyan-400 transition-colors">عروض الاشتراكات</a></li>
-              <li><a href="#why-us" className="hover:text-cyan-400 transition-colors">مميزات الخدمة</a></li>
-              <li><a href="#faq" className="hover:text-cyan-400 transition-colors">الأسئلة الشائعة</a></li>
+              <li><a href="#hero" className="hover:text-cyan-400 transition-colors">{t.nav.home}</a></li>
+              <li><a href="#products" className="hover:text-cyan-400 transition-colors">{t.nav.products}</a></li>
+              <li><a href="#why-us" className="hover:text-cyan-400 transition-colors">{t.nav.whyUs}</a></li>
+              <li><a href="#faq" className="hover:text-cyan-400 transition-colors">{t.nav.faq}</a></li>
             </ul>
           </div>
 
           {/* Contact & Admin */}
           <div className="space-y-3">
-            <h4 className="text-sm font-bold text-white tracking-wider">الدعم والإدارة</h4>
+            <h4 className="text-sm font-bold text-white tracking-wider">{t.footer.supportAdmin}</h4>
             <ul className="space-y-2 text-sm text-slate-400">
               <li>
                 <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400 transition-colors">
-                  تواصل عبر الواتساب
+                  {t.footer.whatsappContact}
                 </a>
               </li>
               <li>
                 <a href={facebookUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 transition-colors">
-                  صفحة الفيسبوك الرسمية
+                  {t.footer.fbPage}
                 </a>
               </li>
               <li className="pt-2">
                 <Link href="/admin" className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>دخول لوحة التحكم</span>
+                  <span>{t.footer.adminLogin}</span>
                 </Link>
               </li>
             </ul>
@@ -89,8 +96,8 @@ export default function Footer() {
 
         {/* Bottom Banner */}
         <div className="pt-8 border-t border-slate-800/80 text-center flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <span>جميع الحقوق محفوظة © {new Date().getFullYear()} AI Studio.</span>
-          <span>تصميم وتطوير مستحدث لأفضل أداء على Vercel.</span>
+          <span>{t.footer.copyright.replace('{year}', String(new Date().getFullYear()))}</span>
+          <span>{t.footer.designText}</span>
         </div>
       </div>
     </footer>

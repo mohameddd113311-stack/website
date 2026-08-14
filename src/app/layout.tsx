@@ -4,6 +4,7 @@ import './globals.css';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import FloatingWhatsApp from '@/components/FloatingWhatsApp';
+import { AppProvider } from '@/context/AppContext';
 
 const cairo = Cairo({
   subsets: ['arabic', 'latin'],
@@ -33,10 +34,12 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} scroll-smooth`}>
       <body className="font-sans bg-dark-bg text-slate-100 min-h-screen flex flex-col selection:bg-cyan-500 selection:text-black">
-        <Header />
-        <main className="flex-grow">{children}</main>
-        <Footer />
-        <FloatingWhatsApp />
+        <AppProvider>
+          <Header />
+          <main className="flex-grow">{children}</main>
+          <Footer />
+          <FloatingWhatsApp />
+        </AppProvider>
       </body>
     </html>
   );
