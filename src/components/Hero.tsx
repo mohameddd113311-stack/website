@@ -5,8 +5,8 @@ import { Sparkles, Zap, ShieldCheck, ArrowDown, MessageCircle, Star } from 'luci
 import { useApp } from '@/context/AppContext';
 
 export default function Hero() {
-  const { lang, t } = useApp();
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201000000000';
+  const { lang, t, settings } = useApp();
+  const whatsappNumber = settings.whatsappNumber || '201021510826';
   
   const whatsappMsg = lang === 'ar'
     ? 'مرحباً AI Studio، أريد الاستفسار عن الاشتراكات والخدمات المتاحة'

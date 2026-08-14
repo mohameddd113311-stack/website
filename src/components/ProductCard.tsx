@@ -10,8 +10,8 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const { lang, currency, formatPrice, t } = useApp();
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201000000000';
+  const { lang, currency, formatPrice, t, settings } = useApp();
+  const whatsappNumber = settings.whatsappNumber || '201021510826';
 
   const formattedPrice = formatPrice(product.price);
   const formattedOriginalPrice = product.originalPrice ? formatPrice(product.originalPrice) : null;
@@ -24,18 +24,17 @@ export default function ProductCard({ product }: ProductCardProps) {
       : product.billingPeriod;
 
   // WhatsApp Message formatted according to language & selected currency
-  const finalMsg = lang === 'ar'
+  const defaultMsg = product.whatsappMsg || (lang === 'ar'
     ? `مرحباً AI Studio، أريد شراء اشتراك [${product.name}] بسعر ${formattedPrice} (${translatedPeriod})`
-    : `Hello AI Studio, I would like to subscribe to [${product.name}] for ${formattedPrice} (${translatedPeriod})`;
+    : `Hello AI Studio, I would like to subscribe to [${product.name}] for ${formattedPrice} (${translatedPeriod})`);
 
-  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(finalMsg)}`;
+  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(defaultMsg)}`;
 
   // Render product graphic
   const renderProductGraphic = () => {
     if (product.imageUrl) {
       return (
         <div className="w-full h-44 rounded-2xl overflow-hidden mb-5 bg-slate-900 border border-slate-800 relative group-hover:border-purple-500/40 transition-colors">
-          {/* eslint-disable-next-html-element-suppress */}
           <img
             src={product.imageUrl}
             alt={product.name}
@@ -134,7 +133,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         {/* Features list */}
         <div className="space-y-3 mb-8">
           <div className="text-xs font-bold text-slate-300 mb-1">{t.productCard.featuresTitle}</div>
-          {product.features.map((feature, idx) => (
+          {product.features && product.features.map((feature, idx) => (
             <div key={idx} className="flex items-start gap-2.5 text-xs text-slate-300">
               <div className="p-0.5 rounded-full bg-emerald-500/20 text-emerald-400 mt-0.5 shrink-0">
                 <Check className="w-3.5 h-3.5" />

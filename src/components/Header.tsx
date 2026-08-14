@@ -8,10 +8,10 @@ import { useApp } from '@/context/AppContext';
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { lang, currency, setLang, setCurrency, t } = useApp();
+  const { lang, currency, setLang, setCurrency, t, settings } = useApp();
 
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201000000000';
-  const facebookUrl = process.env.NEXT_PUBLIC_FACEBOOK_URL || 'https://facebook.com';
+  const whatsappNumber = settings.whatsappNumber || '201021510826';
+  const facebookUrl = settings.facebookUrl || 'https://www.facebook.com/share/1NbRrA56uz/';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -95,7 +95,7 @@ export default function Header() {
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="اللغة العربية"
+                title="اللغة العربية (مع الجنيه المصري)"
               >
                 <span>عربي</span>
               </button>
@@ -106,7 +106,7 @@ export default function Header() {
                     ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="English Language"
+                title="English (with USD)"
               >
                 <Globe className="w-3.5 h-3.5 text-cyan-400" />
                 <span>EN</span>
@@ -147,20 +147,12 @@ export default function Header() {
 
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center gap-2">
-            {/* Compact Selectors for Mobile Top Bar */}
-            <button
-              onClick={() => setCurrency(currency === 'EGP' ? 'USD' : 'EGP')}
-              className="px-2.5 py-1.5 rounded-xl glass-card text-xs font-bold text-cyan-300 border border-slate-800 flex items-center gap-1"
-            >
-              {currency === 'EGP' ? '🇪🇬 EGP' : '🇺🇸 USD'}
-            </button>
-            
             <button
               onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
               className="px-2.5 py-1.5 rounded-xl glass-card text-xs font-bold text-purple-300 border border-slate-800 flex items-center gap-1"
             >
               <Globe className="w-3.5 h-3.5 text-cyan-400" />
-              <span>{lang === 'ar' ? 'EN' : 'عربي'}</span>
+              <span>{lang === 'ar' ? 'EN ($)' : 'عربي (ج.م)'}</span>
             </button>
 
             <button

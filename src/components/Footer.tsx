@@ -6,9 +6,9 @@ import { Sparkles, Facebook, MessageCircle, ShieldCheck } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function Footer() {
-  const { lang, t } = useApp();
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201000000000';
-  const facebookUrl = process.env.NEXT_PUBLIC_FACEBOOK_URL || 'https://facebook.com';
+  const { lang, t, settings } = useApp();
+  const whatsappNumber = settings.whatsappNumber || '201021510826';
+  const facebookUrl = settings.facebookUrl || 'https://www.facebook.com/share/1NbRrA56uz/';
   
   const whatsappMsg = lang === 'ar'
     ? 'مرحباً AI Studio'

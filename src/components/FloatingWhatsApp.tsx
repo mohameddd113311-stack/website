@@ -5,8 +5,8 @@ import { MessageCircle } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function FloatingWhatsApp() {
-  const { lang, t } = useApp();
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201000000000';
+  const { lang, t, settings } = useApp();
+  const whatsappNumber = settings.whatsappNumber || '201021510826';
   
   const whatsappMsg = lang === 'ar'
     ? 'مرحباً، أود التواصل مع فريق دعم AI Studio'

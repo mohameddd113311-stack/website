@@ -92,39 +92,41 @@ let memoryProductsStore: Product[] = [...INITIAL_PRODUCTS];
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'products.json');
 
-function ensureDataFile() {
+function ensureDataDir() {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    if (!fs.existsSync(DATA_FILE)) {
-      fs.writeFileSync(DATA_FILE, JSON.stringify(INITIAL_PRODUCTS, null, 2), 'utf-8');
-    }
   } catch (error) {
-    console.warn("Notice: File system write restricted. Operating in memory mode.", error);
+    console.warn("Notice: Directory creation issue", error);
   }
 }
 
 export function getProducts(): Product[] {
   try {
-    ensureDataFile();
+    ensureDataDir();
     if (fs.existsSync(DATA_FILE)) {
       const fileData = fs.readFileSync(DATA_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         memoryProductsStore = parsed;
       }
+    } else {
+      // Save initial products file
+      try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(INITIAL_PRODUCTS, null, 2), 'utf-8');
+      } catch {}
     }
   } catch (error) {
-    console.warn("Reading from products file failed, using memory store:", error);
+    console.warn("Reading products file failed, using memory store:", error);
   }
   return memoryProductsStore;
 }
 
 export function saveProducts(products: Product[]): boolean {
-  memoryProductsStore = products;
+  memoryProductsStore = [...products];
   try {
-    ensureDataFile();
+    ensureDataDir();
     fs.writeFileSync(DATA_FILE, JSON.stringify(products, null, 2), 'utf-8');
     return true;
   } catch (error) {
