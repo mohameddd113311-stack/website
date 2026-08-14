@@ -1,17 +1,65 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ProductCard from '@/components/ProductCard';
 import { Product } from '@/lib/products';
 import { Sparkles, Layers } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 interface ProductsSectionProps {
-  products: Product[];
+  initialProducts: Product[];
 }
 
-export default function ProductsSection({ products }: ProductsSectionProps) {
+export default function ProductsSection({ initialProducts }: ProductsSectionProps) {
   const { t } = useApp();
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+
+  const syncProductsFromSources = () => {
+    // 1. Fetch fresh products from API
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+          const activeOnly = data.products.filter((p: Product) => p.active !== false);
+          setProducts(activeOnly);
+          try {
+            localStorage.setItem('ai_studio_products_backup', JSON.stringify(data.products));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+
+    // 2. Check localStorage backup as fallback
+    if (typeof window !== 'undefined') {
+      const savedLocal = localStorage.getItem('ai_studio_products_backup');
+      if (savedLocal) {
+        try {
+          const parsed = JSON.parse(savedLocal);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const activeOnly = parsed.filter((p: Product) => p.active !== false);
+            setProducts(prev => (prev.length >= activeOnly.length ? prev : activeOnly));
+          }
+        } catch {}
+      }
+    }
+  };
+
+  useEffect(() => {
+    syncProductsFromSources();
+
+    // Listen for custom products_updated event and window storage event
+    const handleUpdate = () => {
+      syncProductsFromSources();
+    };
+
+    window.addEventListener('products_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('products_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
 
   return (
     <section id="products" className="py-20 relative overflow-hidden grid-bg">

@@ -5,6 +5,7 @@ import WhyUs from '@/components/WhyUs';
 import FAQ from '@/components/FAQ';
 import { getProducts } from '@/lib/products';
 
+export const dynamic = 'force-dynamic';
 export const revalidate = 0; // Fresh products on demand
 
 export default async function HomePage() {
@@ -16,7 +17,7 @@ export default async function HomePage() {
       <Hero />
 
       {/* Products Showcase Section */}
-      <ProductsSection products={products} />
+      <ProductsSection initialProducts={products} />
 
       {/* Why Choose Us */}
       <WhyUs />

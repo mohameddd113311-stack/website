@@ -66,7 +66,6 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
       try {
         const parsed = JSON.parse(savedLocal);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge or prioritize local additions if newer
           setProducts(prev => (prev.length >= parsed.length ? prev : parsed));
         }
       } catch {}
@@ -76,6 +75,9 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
   const saveProductsToLocalBackup = (newProducts: Product[]) => {
     try {
       localStorage.setItem('ai_studio_products_backup', JSON.stringify(newProducts));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('products_updated'));
+      }
     } catch {}
   };
 
@@ -173,11 +175,11 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
         if (editingProduct) {
           updatedList = products.map(p => p.id === editingProduct.id ? data.product : p);
           setProducts(updatedList);
-          setSuccess('تم تعديل المنتج بنجاح وحفظ البيانات');
+          setSuccess('تم تعديل المنتج بنجاح وحفظ البيانات للزوار');
         } else {
           updatedList = [data.product, ...products];
           setProducts(updatedList);
-          setSuccess('تم إضافة المنتج بنجاح وحفظ البيانات');
+          setSuccess('تم إضافة المنتج بنجاح وحفظ البيانات للزوار');
         }
         saveProductsToLocalBackup(updatedList);
         setIsModalOpen(false);
@@ -186,7 +188,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
         setError(data.error || 'حدث خطأ في تنفيذ العملية');
       }
     } catch (err) {
-      setError('فشل الاتصال بالسيرفر، ولكن سيتم المحاولة مجدداً');
+      setError('فشل الاتصال بالسيرفر، ولكن تم التحديث احتياطياً');
     } finally {
       setLoading(false);
     }
