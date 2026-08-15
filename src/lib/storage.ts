@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Product, INITIAL_PRODUCTS } from './products';
 import { SiteSettings, DEFAULT_SETTINGS } from './settings';
+import { prisma } from './db';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
@@ -63,22 +64,56 @@ async function setKvData<T>(key: string, value: T): Promise<boolean> {
 }
 
 /**
- * Load products from KV store first, then local filesystem, then memory, then initial defaults.
+ * Load products from Database (Prisma) first if DATABASE_URL exists,
+ * then Cloud KV, then local filesystem, then memory, then initial defaults.
  */
 export async function loadProductsAsync(): Promise<Product[]> {
-  // 1. Try Cloud KV
+  // 1. Try Prisma Database (PostgreSQL / SQLite)
+  if (process.env.DATABASE_URL) {
+    try {
+      const dbProducts = await prisma.product.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+      if (dbProducts && dbProducts.length > 0) {
+        const mapped: Product[] = dbProducts.map((p) => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          price: p.price,
+          originalPrice: p.originalPrice || undefined,
+          billingPeriod: p.billingPeriod,
+          description: p.description,
+          features: typeof p.features === 'string' ? JSON.parse(p.features) : p.features,
+          badge: p.badge || undefined,
+          popular: p.popular,
+          imageUrl: p.imageUrl || undefined,
+          iconType: (p.iconType as Product['iconType']) || 'custom',
+          whatsappMsg: p.whatsappMsg || undefined,
+          active: p.active,
+          createdAt: p.createdAt.toISOString(),
+          updatedAt: p.updatedAt.toISOString(),
+        }));
+        memoryProducts = mapped;
+        return mapped;
+      }
+    } catch (e) {
+      console.warn("Prisma DB read error, falling back to KV/File:", e);
+    }
+  }
+
+  // 2. Try Cloud KV
   const kvProducts = await getKvData<Product[]>('ai_studio_products');
   if (kvProducts && Array.isArray(kvProducts) && kvProducts.length > 0) {
     memoryProducts = kvProducts;
     return kvProducts;
   }
 
-  // 2. Try Memory
+  // 3. Try Memory
   if (memoryProducts && memoryProducts.length > 0) {
     return memoryProducts;
   }
 
-  // 3. Try Filesystem
+  // 4. Try Filesystem
   try {
     ensureDataDir();
     if (fs.existsSync(PRODUCTS_FILE)) {
@@ -119,12 +154,57 @@ export function loadProductsSync(): Product[] {
 }
 
 /**
- * Save products to Cloud KV, filesystem, and memory store.
+ * Save products to Prisma Database, Cloud KV, filesystem, and memory store.
  */
 export async function saveProductsPersistent(products: Product[]): Promise<boolean> {
   memoryProducts = [...products];
 
-  // 1. Try Filesystem write
+  // 1. Try Prisma DB save if DATABASE_URL exists
+  if (process.env.DATABASE_URL) {
+    try {
+      // Clear and upsert products into DB
+      for (const p of products) {
+        await prisma.product.upsert({
+          where: { id: p.id },
+          update: {
+            name: p.name,
+            category: p.category,
+            price: p.price,
+            originalPrice: p.originalPrice,
+            billingPeriod: p.billingPeriod,
+            description: p.description,
+            features: JSON.stringify(p.features || []),
+            badge: p.badge,
+            popular: p.popular || false,
+            imageUrl: p.imageUrl,
+            iconType: p.iconType || 'custom',
+            whatsappMsg: p.whatsappMsg,
+            active: p.active !== false,
+          },
+          create: {
+            id: p.id,
+            name: p.name,
+            category: p.category,
+            price: p.price,
+            originalPrice: p.originalPrice,
+            billingPeriod: p.billingPeriod,
+            description: p.description,
+            features: JSON.stringify(p.features || []),
+            badge: p.badge,
+            popular: p.popular || false,
+            imageUrl: p.imageUrl,
+            iconType: p.iconType || 'custom',
+            whatsappMsg: p.whatsappMsg,
+            active: p.active !== false,
+          },
+        });
+      }
+    } catch (e) {
+      console.warn("Prisma DB save error:", e);
+    }
+  }
+
+  // 2. Try Filesystem write
   try {
     ensureDataDir();
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
@@ -132,22 +212,41 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
     console.warn("Filesystem write skipped (Serverless environment)", e);
   }
 
-  // 2. Try Cloud KV store if configured
+  // 3. Try Cloud KV store if configured
   await setKvData('ai_studio_products', products);
 
   return true;
 }
 
 /**
- * Load site settings from Cloud KV, filesystem, memory, or defaults.
+ * Load site settings from Prisma DB, Cloud KV, filesystem, memory, or defaults.
  */
 export async function loadSettingsAsync(): Promise<SiteSettings> {
+  if (process.env.DATABASE_URL) {
+    try {
+      const dbSettings = await prisma.siteSetting.findUnique({
+        where: { id: 'default' },
+      });
+      if (dbSettings) {
+        memorySettings = {
+          whatsappNumber: dbSettings.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
+          facebookUrl: dbSettings.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
+          usdToEgpRate: typeof dbSettings.usdToEgpRate === 'number' ? dbSettings.usdToEgpRate : 50,
+          updatedAt: dbSettings.updatedAt.toISOString(),
+        };
+        return memorySettings;
+      }
+    } catch (e) {
+      console.warn("Prisma DB settings read error:", e);
+    }
+  }
+
   const kvSettings = await getKvData<SiteSettings>('ai_studio_settings');
   if (kvSettings && typeof kvSettings === 'object') {
     memorySettings = {
       whatsappNumber: kvSettings.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
       facebookUrl: kvSettings.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
-      usdToEgpRate: typeof kvSettings.usdToEgpRate === 'number' ? kvSettings.usdToEgpRate : DEFAULT_SETTINGS.usdToEgpRate,
+      usdToEgpRate: typeof kvSettings.usdToEgpRate === 'number' ? kvSettings.usdToEgpRate : 50,
       updatedAt: kvSettings.updatedAt || DEFAULT_SETTINGS.updatedAt,
     };
     return memorySettings;
@@ -164,7 +263,7 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
         memorySettings = {
           whatsappNumber: parsed.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
           facebookUrl: parsed.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
-          usdToEgpRate: typeof parsed.usdToEgpRate === 'number' ? parsed.usdToEgpRate : DEFAULT_SETTINGS.usdToEgpRate,
+          usdToEgpRate: typeof parsed.usdToEgpRate === 'number' ? parsed.usdToEgpRate : 50,
           updatedAt: parsed.updatedAt || DEFAULT_SETTINGS.updatedAt,
         };
         return memorySettings;
@@ -191,7 +290,7 @@ export function loadSettingsSync(): SiteSettings {
         memorySettings = {
           whatsappNumber: parsed.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
           facebookUrl: parsed.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
-          usdToEgpRate: typeof parsed.usdToEgpRate === 'number' ? parsed.usdToEgpRate : DEFAULT_SETTINGS.usdToEgpRate,
+          usdToEgpRate: typeof parsed.usdToEgpRate === 'number' ? parsed.usdToEgpRate : 50,
           updatedAt: parsed.updatedAt || DEFAULT_SETTINGS.updatedAt,
         };
         return memorySettings;
@@ -204,10 +303,31 @@ export function loadSettingsSync(): SiteSettings {
 }
 
 /**
- * Save site settings to Cloud KV, filesystem, and memory.
+ * Save site settings to Prisma DB, Cloud KV, filesystem, and memory.
  */
 export async function saveSettingsPersistent(settings: SiteSettings): Promise<SiteSettings> {
   memorySettings = { ...settings };
+
+  if (process.env.DATABASE_URL) {
+    try {
+      await prisma.siteSetting.upsert({
+        where: { id: 'default' },
+        update: {
+          whatsappNumber: settings.whatsappNumber,
+          facebookUrl: settings.facebookUrl,
+          usdToEgpRate: settings.usdToEgpRate || 50,
+        },
+        create: {
+          id: 'default',
+          whatsappNumber: settings.whatsappNumber,
+          facebookUrl: settings.facebookUrl,
+          usdToEgpRate: settings.usdToEgpRate || 50,
+        },
+      });
+    } catch (e) {
+      console.warn("Prisma DB settings write error:", e);
+    }
+  }
 
   try {
     ensureDataDir();

@@ -27,7 +27,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const DEFAULT_SETTINGS: SiteSettings = {
   whatsappNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201021510826',
   facebookUrl: process.env.NEXT_PUBLIC_FACEBOOK_URL || 'https://www.facebook.com/share/1NbRrA56uz/',
-  usdToEgpRate: 5, // Default exchange rate: 5 EGP per 1 USD
+  usdToEgpRate: 50, // Default exchange rate: 50 EGP per 1 USD
 };
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -108,7 +108,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       facebookUrl: newSettings.facebookUrl ? newSettings.facebookUrl.trim() : settings.facebookUrl,
       usdToEgpRate: newSettings.usdToEgpRate !== undefined && !isNaN(Number(newSettings.usdToEgpRate))
         ? Number(newSettings.usdToEgpRate)
-        : settings.usdToEgpRate || 5,
+        : settings.usdToEgpRate || 50,
     };
     setSettingsState(updated);
     if (typeof window !== 'undefined') {
@@ -116,7 +116,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const currentRate = settings.usdToEgpRate && settings.usdToEgpRate > 0 ? settings.usdToEgpRate : 5;
+  const currentRate = settings.usdToEgpRate && settings.usdToEgpRate > 0 ? settings.usdToEgpRate : 50;
+
 
   const convertPrice = (usdPrice: string | number): number => {
     const num = typeof usdPrice === 'number' ? usdPrice : parseFloat(usdPrice);

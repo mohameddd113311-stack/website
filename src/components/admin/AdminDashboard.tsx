@@ -29,7 +29,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
   const [settingsForm, setSettingsForm] = useState({
     whatsappNumber: settings.whatsappNumber,
     facebookUrl: settings.facebookUrl,
-    usdToEgpRate: settings.usdToEgpRate || 5,
+    usdToEgpRate: settings.usdToEgpRate || 50,
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState('');
@@ -62,9 +62,10 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
     setSettingsForm({
       whatsappNumber: settings.whatsappNumber,
       facebookUrl: settings.facebookUrl,
-      usdToEgpRate: settings.usdToEgpRate || 5,
+      usdToEgpRate: settings.usdToEgpRate || 50,
     });
   }, [settings]);
+
 
 
   // Sync client-side localStorage fallback for products to ensure edits & additions never vanish
@@ -615,13 +616,14 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
                 required
                 value={settingsForm.usdToEgpRate}
                 onChange={(e) => setSettingsForm({ ...settingsForm, usdToEgpRate: parseFloat(e.target.value) || 0 })}
-                placeholder="القيمة الافتراضية: 5"
+                placeholder="القيمة الافتراضية: 50"
                 className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:border-cyan-400 font-mono"
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                القيمة الافتراضية هي 5 جنيه لكل 1 دولار. تضمن التحويل التلقائي لأسعار كافة المنتجات بالجنيه المصري (EGP) للزوار.
+                القيمة الافتراضية هي 50 جنيه لكل 1 دولار. تضمن التحويل التلقائي لأسعار كافة المنتجات بالجنيه المصري (EGP) للزوار.
               </p>
             </div>
+
 
 
             <div className="pt-4 border-t border-slate-800">

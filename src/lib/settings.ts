@@ -10,7 +10,7 @@ export interface SiteSettings {
 export const DEFAULT_SETTINGS: SiteSettings = {
   whatsappNumber: '201021510826',
   facebookUrl: 'https://www.facebook.com/share/1NbRrA56uz/',
-  usdToEgpRate: 5, // Default: 5 EGP per 1 USD
+  usdToEgpRate: 50, // Default: 50 EGP per 1 USD
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
@@ -32,12 +32,13 @@ export function saveSiteSettings(settings: Partial<SiteSettings>): SiteSettings 
   const updated: SiteSettings = {
     whatsappNumber: settings.whatsappNumber ? settings.whatsappNumber.trim() : current.whatsappNumber,
     facebookUrl: settings.facebookUrl ? settings.facebookUrl.trim() : current.facebookUrl,
-    usdToEgpRate: parsedRate > 0 ? parsedRate : 5,
+    usdToEgpRate: parsedRate > 0 ? parsedRate : 50,
     updatedAt: new Date().toISOString(),
   };
 
   saveSettingsPersistent(updated);
   return updated;
 }
+
 
 
