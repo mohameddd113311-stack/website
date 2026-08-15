@@ -1,70 +1,43 @@
-import fs from 'fs';
-import path from 'path';
+import { loadSettingsSync, loadSettingsAsync, saveSettingsPersistent } from './storage';
 
 export interface SiteSettings {
   whatsappNumber: string;
   facebookUrl: string;
+  usdToEgpRate: number; // 1 USD = X EGP (default: 5)
+  updatedAt?: string;
 }
 
 export const DEFAULT_SETTINGS: SiteSettings = {
   whatsappNumber: '201021510826',
   facebookUrl: 'https://www.facebook.com/share/1NbRrA56uz/',
+  usdToEgpRate: 5, // Default: 5 EGP per 1 USD
+  updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-let memorySettingsStore: SiteSettings = { ...DEFAULT_SETTINGS };
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
-
-function ensureDataDir() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  } catch (error) {
-    console.warn("Notice: File system write restricted.", error);
-  }
+export function getSiteSettings(): SiteSettings {
+  return loadSettingsSync();
 }
 
-export function getSiteSettings(): SiteSettings {
-  try {
-    ensureDataDir();
-    if (fs.existsSync(SETTINGS_FILE)) {
-      const fileData = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-      const parsed = JSON.parse(fileData);
-      if (parsed && typeof parsed === 'object') {
-        memorySettingsStore = {
-          whatsappNumber: parsed.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
-          facebookUrl: parsed.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
-        };
-      }
-    } else {
-      // Create initial settings file if not existing
-      try {
-        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2), 'utf-8');
-      } catch {}
-    }
-  } catch (error) {
-    console.warn("Reading settings file failed, using memory store:", error);
-  }
-  return memorySettingsStore;
+export async function getSiteSettingsAsync(): Promise<SiteSettings> {
+  return await loadSettingsAsync();
 }
 
 export function saveSiteSettings(settings: Partial<SiteSettings>): SiteSettings {
   const current = getSiteSettings();
+  
+  const parsedRate = settings.usdToEgpRate !== undefined && !isNaN(Number(settings.usdToEgpRate))
+    ? Number(settings.usdToEgpRate)
+    : current.usdToEgpRate || DEFAULT_SETTINGS.usdToEgpRate;
+
   const updated: SiteSettings = {
     whatsappNumber: settings.whatsappNumber ? settings.whatsappNumber.trim() : current.whatsappNumber,
     facebookUrl: settings.facebookUrl ? settings.facebookUrl.trim() : current.facebookUrl,
+    usdToEgpRate: parsedRate > 0 ? parsedRate : 5,
+    updatedAt: new Date().toISOString(),
   };
 
-  memorySettingsStore = updated;
-
-  try {
-    ensureDataDir();
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2), 'utf-8');
-  } catch (error) {
-    console.warn("Saved settings to memory store", error);
-  }
-
+  saveSettingsPersistent(updated);
   return updated;
 }
+
+

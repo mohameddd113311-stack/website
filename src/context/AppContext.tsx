@@ -3,9 +3,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translations, Language, Currency } from '@/lib/translations';
 
-interface SiteSettings {
+export interface SiteSettings {
   whatsappNumber: string;
   facebookUrl: string;
+  usdToEgpRate: number;
 }
 
 interface AppContextType {
@@ -23,11 +24,10 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const USD_TO_EGP_RATE = 50; // 1 USD = 50 EGP
-
 const DEFAULT_SETTINGS: SiteSettings = {
   whatsappNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201021510826',
   facebookUrl: process.env.NEXT_PUBLIC_FACEBOOK_URL || 'https://www.facebook.com/share/1NbRrA56uz/',
+  usdToEgpRate: 5, // Default exchange rate: 5 EGP per 1 USD
 };
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -44,7 +44,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (savedLang && (savedLang === 'ar' || savedLang === 'en')) {
       setLangState(savedLang);
-      setCurrencyState(savedLang === 'ar' ? 'EGP' : 'USD');
+    }
+    if (savedCurrency && (savedCurrency === 'EGP' || savedCurrency === 'USD')) {
+      setCurrencyState(savedCurrency);
     }
 
     if (savedSettingsStr) {
@@ -53,6 +55,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSettingsState({
           whatsappNumber: parsed.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
           facebookUrl: parsed.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
+          usdToEgpRate: parsed.usdToEgpRate ? Number(parsed.usdToEgpRate) : DEFAULT_SETTINGS.usdToEgpRate,
         });
       } catch {}
     }
@@ -62,9 +65,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .then(res => res.json())
       .then(data => {
         if (data.success && data.settings) {
-          const newSet = {
+          const newSet: SiteSettings = {
             whatsappNumber: data.settings.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
             facebookUrl: data.settings.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
+            usdToEgpRate: data.settings.usdToEgpRate ? Number(data.settings.usdToEgpRate) : DEFAULT_SETTINGS.usdToEgpRate,
           };
           setSettingsState(newSet);
           localStorage.setItem('ai_studio_settings', JSON.stringify(newSet));
@@ -89,12 +93,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currency, mounted]);
 
-  // When changing language, automatically bind currency:
-  // Arabic -> EGP (جنيه مصري)
-  // English -> USD (دولار)
+  // Allow setting language without overriding chosen currency unless needed
   const setLang = (newLang: Language) => {
     setLangState(newLang);
-    setCurrencyState(newLang === 'ar' ? 'EGP' : 'USD');
   };
 
   const setCurrency = (newCurrency: Currency) => {
@@ -102,9 +103,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateSettings = (newSettings: Partial<SiteSettings>) => {
-    const updated = {
+    const updated: SiteSettings = {
       whatsappNumber: newSettings.whatsappNumber ? newSettings.whatsappNumber.trim() : settings.whatsappNumber,
       facebookUrl: newSettings.facebookUrl ? newSettings.facebookUrl.trim() : settings.facebookUrl,
+      usdToEgpRate: newSettings.usdToEgpRate !== undefined && !isNaN(Number(newSettings.usdToEgpRate))
+        ? Number(newSettings.usdToEgpRate)
+        : settings.usdToEgpRate || 5,
     };
     setSettingsState(updated);
     if (typeof window !== 'undefined') {
@@ -112,11 +116,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const currentRate = settings.usdToEgpRate && settings.usdToEgpRate > 0 ? settings.usdToEgpRate : 5;
+
   const convertPrice = (usdPrice: string | number): number => {
     const num = typeof usdPrice === 'number' ? usdPrice : parseFloat(usdPrice);
     if (isNaN(num)) return 0;
-    if (currency === 'EGP' || lang === 'ar') {
-      return Math.round(num * USD_TO_EGP_RATE);
+    if (currency === 'EGP') {
+      return Math.round(num * currentRate);
     }
     return num;
   };
@@ -125,8 +131,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const num = typeof usdPrice === 'number' ? usdPrice : parseFloat(usdPrice);
     if (isNaN(num)) return String(usdPrice);
 
-    if (currency === 'EGP' || lang === 'ar') {
-      const egpAmount = Math.round(num * USD_TO_EGP_RATE);
+    if (currency === 'EGP') {
+      const egpAmount = Math.round(num * currentRate);
       return lang === 'ar' ? `${egpAmount} ج.م` : `${egpAmount} EGP`;
     }
 
@@ -134,11 +140,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const getCurrencySymbol = (): string => {
-    if (currency === 'EGP' || lang === 'ar') {
+    if (currency === 'EGP') {
       return lang === 'ar' ? 'ج.م' : 'EGP';
     }
     return '$';
   };
+
 
   const currentTranslations = translations[lang] || translations.ar;
 

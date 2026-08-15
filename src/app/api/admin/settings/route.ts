@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getSiteSettings, saveSiteSettings } from '@/lib/settings';
+import { getSiteSettingsAsync, saveSiteSettings } from '@/lib/settings';
 import { isAdminAuthenticated, sanitizeInput } from '@/lib/auth';
 
 export async function GET() {
-  const settings = getSiteSettings();
+  const settings = await getSiteSettingsAsync();
   return NextResponse.json({ success: true, settings });
 }
 
@@ -18,11 +18,12 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { whatsappNumber, facebookUrl } = body;
+    const { whatsappNumber, facebookUrl, usdToEgpRate } = body;
 
     const updated = saveSiteSettings({
       whatsappNumber: whatsappNumber ? sanitizeInput(whatsappNumber) : undefined,
       facebookUrl: facebookUrl ? sanitizeInput(facebookUrl) : undefined,
+      usdToEgpRate: usdToEgpRate !== undefined && !isNaN(Number(usdToEgpRate)) ? Number(usdToEgpRate) : undefined,
     });
 
     return NextResponse.json({ success: true, settings: updated });
@@ -34,3 +35,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

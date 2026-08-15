@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getProducts, addProduct } from '@/lib/products';
+import { getProductsAsync, addProduct } from '@/lib/products';
 import { isAdminAuthenticated, sanitizeInput } from '@/lib/auth';
 
 export async function GET() {
-  const products = getProducts();
+  const products = await getProductsAsync();
   return NextResponse.json({ success: true, products });
 }
 

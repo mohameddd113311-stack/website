@@ -14,32 +14,64 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
   const { t } = useApp();
   const [products, setProducts] = useState<Product[]>(initialProducts);
 
-  const syncProductsFromSources = () => {
-    // 1. Fetch fresh products from API
-    fetch('/api/products')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
-          const activeOnly = data.products.filter((p: Product) => p.active !== false);
-          setProducts(activeOnly);
-          try {
-            localStorage.setItem('ai_studio_products_backup', JSON.stringify(data.products));
-          } catch {}
-        }
-      })
-      .catch(() => {});
+  const syncProductsFromSources = async () => {
+    let localBackupProducts: Product[] | null = null;
 
-    // 2. Check localStorage backup as fallback
     if (typeof window !== 'undefined') {
       const savedLocal = localStorage.getItem('ai_studio_products_backup');
       if (savedLocal) {
         try {
           const parsed = JSON.parse(savedLocal);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const activeOnly = parsed.filter((p: Product) => p.active !== false);
-            setProducts(prev => (prev.length >= activeOnly.length ? prev : activeOnly));
+            localBackupProducts = parsed;
           }
         } catch {}
+      }
+    }
+
+    try {
+      const res = await fetch('/api/products');
+      const data = await res.json();
+
+      if (data.success && Array.isArray(data.products)) {
+        const serverProducts: Product[] = data.products;
+
+        if (localBackupProducts && localBackupProducts.length > 0) {
+          // Compare latest update timestamps
+          const getLatestTimestamp = (list: Product[]) => {
+            return list.reduce((max, p) => {
+              const time = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
+              return time > max ? time : max;
+            }, 0);
+          };
+
+          const serverLatest = getLatestTimestamp(serverProducts);
+          const localLatest = getLatestTimestamp(localBackupProducts);
+
+          // If local backup has newer edits or more items than server, prefer local backup
+          if (localLatest > serverLatest || (localBackupProducts.length > serverProducts.length && serverLatest <= 1767225600000)) {
+            const activeOnly = localBackupProducts.filter((p: Product) => p.active !== false);
+            setProducts(activeOnly);
+            return;
+          }
+        }
+
+        // Otherwise use server products
+        const activeOnly = serverProducts.filter((p: Product) => p.active !== false);
+        setProducts(activeOnly);
+        if (typeof window !== 'undefined' && serverProducts.length > 0) {
+          try {
+            localStorage.setItem('ai_studio_products_backup', JSON.stringify(serverProducts));
+          } catch {}
+        }
+      } else if (localBackupProducts && localBackupProducts.length > 0) {
+        const activeOnly = localBackupProducts.filter((p: Product) => p.active !== false);
+        setProducts(activeOnly);
+      }
+    } catch (err) {
+      if (localBackupProducts && localBackupProducts.length > 0) {
+        const activeOnly = localBackupProducts.filter((p: Product) => p.active !== false);
+        setProducts(activeOnly);
       }
     }
   };

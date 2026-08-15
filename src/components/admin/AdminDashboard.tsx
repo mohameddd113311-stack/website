@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Product } from '@/lib/products';
 import {
   Plus, Edit, Trash2, LogOut, Package, Flame, Sparkles, Check, X,
-  ShieldCheck, ExternalLink, Settings, Phone, Facebook, Upload, Image as ImageIcon
+  ShieldCheck, ExternalLink, Settings, Phone, Facebook, Upload, Image as ImageIcon,
+  Download, RefreshCw, Database, CheckCircle2, DollarSign
 } from 'lucide-react';
+
 import { useApp } from '@/context/AppContext';
 
 interface AdminDashboardProps {
@@ -27,13 +29,17 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
   const [settingsForm, setSettingsForm] = useState({
     whatsappNumber: settings.whatsappNumber,
     facebookUrl: settings.facebookUrl,
+    usdToEgpRate: settings.usdToEgpRate || 5,
   });
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState('');
   const [settingsError, setSettingsError] = useState('');
 
-  // Active Tab: 'products' | 'settings'
-  const [activeTab, setActiveTab] = useState<'products' | 'settings'>('products');
+  // Active Tab: 'products' | 'settings' | 'backup'
+  const [activeTab, setActiveTab] = useState<'products' | 'settings' | 'backup'>('products');
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupMessage, setBackupMessage] = useState('');
+  const [backupError, setBackupError] = useState('');
 
   // Product Form State
   const [formData, setFormData] = useState({
@@ -56,8 +62,10 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
     setSettingsForm({
       whatsappNumber: settings.whatsappNumber,
       facebookUrl: settings.facebookUrl,
+      usdToEgpRate: settings.usdToEgpRate || 5,
     });
   }, [settings]);
+
 
   // Sync client-side localStorage fallback for products to ensure edits & additions never vanish
   useEffect(() => {
@@ -79,6 +87,105 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
         window.dispatchEvent(new Event('products_updated'));
       }
     } catch {}
+  };
+
+  const handleDownloadBackup = async () => {
+    setBackupLoading(true);
+    setBackupError('');
+    setBackupMessage('');
+    try {
+      const res = await fetch('/api/admin/backup');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const jsonStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ai_studio_backup_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setBackupMessage('تم تصدير النسخة الاحتياطية بنجاح واحتفاظها بكافة المنتجات!');
+      } else {
+        setBackupError(data.error || 'فشل تصدير النسخة الاحتياطية');
+      }
+    } catch (err) {
+      setBackupError('حدث خطأ أثناء تصدير البيانات');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleRestoreBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBackupLoading(true);
+    setBackupError('');
+    setBackupMessage('');
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+
+      if (!parsed || (!parsed.products && !Array.isArray(parsed))) {
+        throw new Error('تنسيق ملف النسخة الاحتياطية غير صالح');
+      }
+
+      const productsToRestore = Array.isArray(parsed) ? parsed : parsed.products;
+      const settingsToRestore = parsed.settings;
+
+      const res = await fetch('/api/admin/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products: productsToRestore, settings: settingsToRestore }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        if (Array.isArray(data.products)) {
+          setProducts(data.products);
+          saveProductsToLocalBackup(data.products);
+        }
+        if (data.settings) {
+          updateSettings(data.settings);
+        }
+        setBackupMessage('تم استعادة النسخة الاحتياطية وتحديث المنتجات والموقع بنجاح!');
+        router.refresh();
+      } else {
+        setBackupError(data.error || 'فشل استعادة النسخة الاحتياطية');
+      }
+    } catch (err: any) {
+      setBackupError(err.message || 'خطأ في قراءة ملف JSON');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleForceSyncServer = async () => {
+    setBackupLoading(true);
+    setBackupError('');
+    setBackupMessage('');
+    try {
+      const res = await fetch('/api/products/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBackupMessage('تم إعادة مزامنة وتثبيت كافة المنتجات في السيرفر بنجاح!');
+      } else {
+        setBackupError(data.error || 'فشل المزامنة');
+      }
+    } catch (err) {
+      setBackupError('خطأ أثناء المزامنة بالسيرفر');
+    } finally {
+      setBackupLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -254,7 +361,13 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
             </div>
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white">لوحة تحكم وإدارة AI Studio</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-white">لوحة تحكم وإدارة AI Studio</h1>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                <CheckCircle2 className="w-3 h-3" />
+                حفظ دائم ومستمر
+              </span>
+            </div>
             <p className="text-xs text-slate-400">إدارة المنتجات، التعديل، الحفظ، ورقم الواتساب والفيسبوك</p>
           </div>
         </div>
@@ -288,7 +401,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-3 mb-8 border-b border-slate-800 pb-4">
+      <div className="flex items-center gap-3 mb-8 border-b border-slate-800 pb-4 flex-wrap">
         <button
           onClick={() => setActiveTab('products')}
           className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
@@ -311,6 +424,18 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
         >
           <Settings className="w-4 h-4" />
           <span>إعدادات المتجر (الواتساب والفيسبوك)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('backup')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'backup'
+              ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg'
+              : 'glass-card border border-slate-800 text-slate-400 hover:text-white'
+          }`}
+        >
+          <Database className="w-4 h-4" />
+          <span>النسخ الاحتياطي والاستعادة</span>
         </button>
       </div>
 
@@ -478,6 +603,27 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
               </p>
             </div>
 
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-2 flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-amber-400" />
+                <span>سعر الصرف (كم جنيه مصري مقابل 1 دولار أمريكي) *</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.1"
+                required
+                value={settingsForm.usdToEgpRate}
+                onChange={(e) => setSettingsForm({ ...settingsForm, usdToEgpRate: parseFloat(e.target.value) || 0 })}
+                placeholder="القيمة الافتراضية: 5"
+                className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white text-sm focus:border-cyan-400 font-mono"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                القيمة الافتراضية هي 5 جنيه لكل 1 دولار. تضمن التحويل التلقائي لأسعار كافة المنتجات بالجنيه المصري (EGP) للزوار.
+              </p>
+            </div>
+
+
             <div className="pt-4 border-t border-slate-800">
               <button
                 type="submit"
@@ -488,6 +634,98 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* TAB 3: BACKUP & RESTORE */}
+      {activeTab === 'backup' && (
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="glass-card rounded-3xl p-8 border border-cyan-500/30">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
+              <Database className="w-6 h-6 text-cyan-400" />
+              <div>
+                <h2 className="text-xl font-bold text-white">إدارة النسخ الاحتياطي والاستعادة الدائمة</h2>
+                <p className="text-xs text-slate-400">تصدير بيانات المنتجات والإعدادات في ملف JSON للحفاظ عليها دائماً</p>
+              </div>
+            </div>
+
+            {backupMessage && (
+              <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-between">
+                <span>{backupMessage}</span>
+                <button onClick={() => setBackupMessage('')}><X className="w-4 h-4" /></button>
+              </div>
+            )}
+
+            {backupError && (
+              <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center justify-between">
+                <span>{backupError}</span>
+                <button onClick={() => setBackupError('')}><X className="w-4 h-4" /></button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Export Box */}
+              <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-4">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-base font-bold text-white mb-2">تصدير نسخة احتياطية (JSON)</h3>
+                  <p className="text-xs text-slate-400 mb-6">
+                    تحميل ملف كافّة المنتجات والاشتراكات الحالية والإعدادات لحفظه بأمان على جهازك.
+                  </p>
+                </div>
+                <button
+                  onClick={handleDownloadBackup}
+                  disabled={backupLoading}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{backupLoading ? 'جاري التحميل...' : 'تحميل النسخة الاحتياطية'}</span>
+                </button>
+              </div>
+
+              {/* Restore Box */}
+              <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
+                <div>
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-4">
+                    <Upload className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-base font-bold text-white mb-2">استعادة نسخة احتياطية</h3>
+                  <p className="text-xs text-slate-400 mb-6">
+                    رفع ملف JSON مسبق لاستعادة المنتجات والإعدادات فوراً على السيرفر والموقع.
+                  </p>
+                </div>
+                <label className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors cursor-pointer text-center">
+                  <Upload className="w-4 h-4" />
+                  <span>{backupLoading ? 'جاري الاستعادة...' : 'اختيار ملف النسخة الاحتياطية'}</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleRestoreBackupFile}
+                    disabled={backupLoading}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Sync Button Box */}
+            <div className="mt-6 pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h4 className="text-xs font-bold text-slate-300">مزامنة البيانات الحالية بالسيرفر</h4>
+                <p className="text-[11px] text-slate-500">إعادة تأكيد وتثبيت المنتجات الحالية المفتوحة في اللوحة بالسيرفر فوراً.</p>
+              </div>
+              <button
+                onClick={handleForceSyncServer}
+                disabled={backupLoading}
+                className="px-5 py-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold flex items-center gap-2"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${backupLoading ? 'animate-spin' : ''}`} />
+                <span>إعادة مزامنة السيرفر الآن</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

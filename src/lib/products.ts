@@ -17,6 +17,7 @@ export interface Product {
   whatsappMsg?: string;
   active: boolean;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export const INITIAL_PRODUCTS: Product[] = [
@@ -40,7 +41,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     iconType: "gemini",
     whatsappMsg: "مرحباً، أريد شراء اشتراك Gemini Pro",
     active: true,
-    createdAt: new Date().toISOString()
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z"
   },
   {
     id: "chatgpt-plus-sub",
@@ -62,7 +64,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     iconType: "chatgpt",
     whatsappMsg: "مرحباً، أريد شراء اشتراك ChatGPT Plus",
     active: true,
-    createdAt: new Date().toISOString()
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z"
   },
   {
     id: "capcut-pro-sub",
@@ -84,68 +87,47 @@ export const INITIAL_PRODUCTS: Product[] = [
     iconType: "capcut",
     whatsappMsg: "مرحباً، أريد شراء اشتراك CapCut Pro",
     active: true,
-    createdAt: new Date().toISOString()
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z"
   }
 ];
 
-let memoryProductsStore: Product[] = [...INITIAL_PRODUCTS];
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DATA_FILE = path.join(DATA_DIR, 'products.json');
-
-function ensureDataDir() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  } catch (error) {
-    console.warn("Notice: Directory creation issue", error);
-  }
-}
+import { loadProductsSync, loadProductsAsync, saveProductsPersistent } from './storage';
 
 export function getProducts(): Product[] {
-  try {
-    ensureDataDir();
-    if (fs.existsSync(DATA_FILE)) {
-      const fileData = fs.readFileSync(DATA_FILE, 'utf-8');
-      const parsed = JSON.parse(fileData);
-      if (Array.isArray(parsed)) {
-        memoryProductsStore = parsed;
-      }
-    } else {
-      // Save initial products file
-      try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(INITIAL_PRODUCTS, null, 2), 'utf-8');
-      } catch {}
-    }
-  } catch (error) {
-    console.warn("Reading products file failed, using memory store:", error);
-  }
-  return memoryProductsStore;
+  return loadProductsSync();
+}
+
+export async function getProductsAsync(): Promise<Product[]> {
+  return await loadProductsAsync();
 }
 
 export function saveProducts(products: Product[]): boolean {
-  memoryProductsStore = [...products];
-  try {
-    ensureDataDir();
-    fs.writeFileSync(DATA_FILE, JSON.stringify(products, null, 2), 'utf-8');
-    return true;
-  } catch (error) {
-    console.warn("Saved to memory store (Serverless mode active)", error);
-    return true;
-  }
+  const now = new Date().toISOString();
+  const productsWithTimestamps = products.map(p => ({
+    ...p,
+    createdAt: p.createdAt || now,
+    updatedAt: p.updatedAt || now,
+  }));
+
+  saveProductsPersistent(productsWithTimestamps);
+  return true;
 }
+
 
 export function getProductById(id: string): Product | undefined {
   const products = getProducts();
   return products.find(p => p.id === id);
 }
 
-export function addProduct(productData: Omit<Product, 'id' | 'createdAt'>): Product {
+export function addProduct(productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Product {
   const products = getProducts();
+  const now = new Date().toISOString();
   const newProduct: Product = {
     ...productData,
     id: 'prod_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
-    createdAt: new Date().toISOString()
+    createdAt: now,
+    updatedAt: now,
   };
   const updated = [newProduct, ...products];
   saveProducts(updated);
@@ -157,7 +139,12 @@ export function updateProduct(id: string, productData: Partial<Product>): Produc
   const index = products.findIndex(p => p.id === id);
   if (index === -1) return null;
 
-  const updatedProduct = { ...products[index], ...productData };
+  const now = new Date().toISOString();
+  const updatedProduct = { 
+    ...products[index], 
+    ...productData,
+    updatedAt: now,
+  };
   products[index] = updatedProduct;
   saveProducts(products);
   return updatedProduct;
