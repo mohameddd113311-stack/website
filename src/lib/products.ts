@@ -7,6 +7,7 @@ export interface Product {
   category: string;
   price: string;
   originalPrice?: string;
+  stockQuantity?: number;
   billingPeriod: string;
   description: string;
   features: string[];
@@ -19,6 +20,7 @@ export interface Product {
   createdAt: string;
   updatedAt?: string;
 }
+
 
 export const INITIAL_PRODUCTS: Product[] = [
   {

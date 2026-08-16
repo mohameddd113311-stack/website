@@ -63,11 +63,25 @@ async function setKvData<T>(key: string, value: T): Promise<boolean> {
   }
 }
 
+import {
+  fetchProductsFromSupabase,
+  saveProductToSupabase,
+  fetchSettingsFromSupabase,
+  saveSettingsToSupabase,
+} from './supabase';
+
 /**
- * Load products from Database (Prisma) first if DATABASE_URL exists,
- * then Cloud KV, then local filesystem, then memory, then initial defaults.
+ * Load products from Supabase first if configured,
+ * then Database (Prisma), then Cloud KV, then local filesystem, then memory, then initial defaults.
  */
 export async function loadProductsAsync(): Promise<Product[]> {
+  // 0. Try Supabase Database
+  const supabaseProducts = await fetchProductsFromSupabase();
+  if (supabaseProducts && supabaseProducts.length > 0) {
+    memoryProducts = supabaseProducts;
+    return supabaseProducts;
+  }
+
   // 1. Try Prisma Database (PostgreSQL / SQLite)
   if (process.env.DATABASE_URL) {
     try {
@@ -100,6 +114,7 @@ export async function loadProductsAsync(): Promise<Product[]> {
       console.warn("Prisma DB read error, falling back to KV/File:", e);
     }
   }
+
 
   // 2. Try Cloud KV
   const kvProducts = await getKvData<Product[]>('ai_studio_products');
@@ -154,10 +169,15 @@ export function loadProductsSync(): Product[] {
 }
 
 /**
- * Save products to Prisma Database, Cloud KV, filesystem, and memory store.
+ * Save products to Supabase, Prisma Database, Cloud KV, filesystem, and memory store.
  */
 export async function saveProductsPersistent(products: Product[]): Promise<boolean> {
   memoryProducts = [...products];
+
+  // 0. Try Supabase save
+  for (const p of products) {
+    await saveProductToSupabase(p);
+  }
 
   // 1. Try Prisma DB save if DATABASE_URL exists
   if (process.env.DATABASE_URL) {
@@ -204,6 +224,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
     }
   }
 
+
   // 2. Try Filesystem write
   try {
     ensureDataDir();
@@ -219,9 +240,15 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
 }
 
 /**
- * Load site settings from Prisma DB, Cloud KV, filesystem, memory, or defaults.
+ * Load site settings from Supabase, Prisma DB, Cloud KV, filesystem, memory, or defaults.
  */
 export async function loadSettingsAsync(): Promise<SiteSettings> {
+  const supabaseSettings = await fetchSettingsFromSupabase();
+  if (supabaseSettings) {
+    memorySettings = supabaseSettings;
+    return supabaseSettings;
+  }
+
   if (process.env.DATABASE_URL) {
     try {
       const dbSettings = await prisma.siteSetting.findUnique({
@@ -240,6 +267,7 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
       console.warn("Prisma DB settings read error:", e);
     }
   }
+
 
   const kvSettings = await getKvData<SiteSettings>('ai_studio_settings');
   if (kvSettings && typeof kvSettings === 'object') {
@@ -303,12 +331,15 @@ export function loadSettingsSync(): SiteSettings {
 }
 
 /**
- * Save site settings to Prisma DB, Cloud KV, filesystem, and memory.
+ * Save site settings to Supabase, Prisma DB, Cloud KV, filesystem, and memory.
  */
 export async function saveSettingsPersistent(settings: SiteSettings): Promise<SiteSettings> {
   memorySettings = { ...settings };
 
+  await saveSettingsToSupabase(settings);
+
   if (process.env.DATABASE_URL) {
+
     try {
       await prisma.siteSetting.upsert({
         where: { id: 'default' },

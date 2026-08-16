@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { updateProduct, deleteProduct } from '@/lib/products';
 import { isAdminAuthenticated, sanitizeInput } from '@/lib/auth';
+import { deleteProductFromSupabase } from '@/lib/supabase';
 
 export async function PUT(
   request: Request,
@@ -23,6 +24,7 @@ export async function PUT(
     if (body.category) updateData.category = sanitizeInput(body.category);
     if (body.price) updateData.price = sanitizeInput(body.price);
     if (body.originalPrice !== undefined) updateData.originalPrice = body.originalPrice ? sanitizeInput(body.originalPrice) : undefined;
+    if (body.stockQuantity !== undefined) updateData.stockQuantity = Number(body.stockQuantity);
     if (body.billingPeriod) updateData.billingPeriod = sanitizeInput(body.billingPeriod);
     if (body.description) updateData.description = sanitizeInput(body.description);
     if (body.badge !== undefined) updateData.badge = body.badge ? sanitizeInput(body.badge) : undefined;
@@ -71,6 +73,7 @@ export async function DELETE(
   }
 
   const { id } = params;
+  await deleteProductFromSupabase(id);
   const deleted = deleteProduct(id);
 
   if (!deleted) {
@@ -82,3 +85,4 @@ export async function DELETE(
 
   return NextResponse.json({ success: true, message: 'تم حذف المنتج بنجاح' });
 }
+
