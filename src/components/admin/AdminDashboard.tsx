@@ -68,17 +68,37 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
 
 
 
-  // Sync client-side localStorage fallback for products to ensure edits & additions never vanish
+  // Fetch latest products from server API on mount, with localStorage fallback
   useEffect(() => {
-    const savedLocal = localStorage.getItem('ai_studio_products_backup');
-    if (savedLocal) {
-      try {
-        const parsed = JSON.parse(savedLocal);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setProducts(prev => (prev.length >= parsed.length ? prev : parsed));
+    fetch('/api/products')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+          setProducts(data.products);
+          saveProductsToLocalBackup(data.products);
+        } else {
+          const savedLocal = localStorage.getItem('ai_studio_products_backup');
+          if (savedLocal) {
+            try {
+              const parsed = JSON.parse(savedLocal);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setProducts(parsed);
+              }
+            } catch {}
+          }
         }
-      } catch {}
-    }
+      })
+      .catch(() => {
+        const savedLocal = localStorage.getItem('ai_studio_products_backup');
+        if (savedLocal) {
+          try {
+            const parsed = JSON.parse(savedLocal);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setProducts(parsed);
+            }
+          } catch {}
+        }
+      });
   }, []);
 
   const saveProductsToLocalBackup = (newProducts: Product[]) => {
@@ -235,25 +255,58 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
     setIsModalOpen(true);
   };
 
-  // Image Upload handler to convert file to Base64 Data URL
+  // Image Upload handler with Canvas Compression to ensure light & fast Base64 Data URL
   const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 5 ميجابايت');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('حجم الصورة كبير جداً، يرجى اختيار صورة أقل من 10 ميجابايت');
       return;
     }
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setFormData(prev => ({ ...prev, imageUrl: result }));
-      }
+      const rawResult = event.target?.result as string;
+      if (!rawResult) return;
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          setFormData(prev => ({ ...prev, imageUrl: compressedDataUrl }));
+        } else {
+          setFormData(prev => ({ ...prev, imageUrl: rawResult }));
+        }
+      };
+      img.onerror = () => {
+        setFormData(prev => ({ ...prev, imageUrl: rawResult }));
+      };
+      img.src = rawResult;
     };
     reader.readAsDataURL(file);
   };
+
 
   const handleSubmitProduct = async (e: React.FormEvent) => {
     e.preventDefault();

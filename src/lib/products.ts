@@ -116,6 +116,16 @@ export function saveProducts(products: Product[]): boolean {
   return true;
 }
 
+export async function saveProductsAsync(products: Product[]): Promise<boolean> {
+  const now = new Date().toISOString();
+  const productsWithTimestamps = products.map(p => ({
+    ...p,
+    createdAt: p.createdAt || now,
+    updatedAt: p.updatedAt || now,
+  }));
+
+  return await saveProductsPersistent(productsWithTimestamps);
+}
 
 export function getProductById(id: string): Product | undefined {
   const products = getProducts();
@@ -136,6 +146,20 @@ export function addProduct(productData: Omit<Product, 'id' | 'createdAt' | 'upda
   return newProduct;
 }
 
+export async function addProductAsync(productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {
+  const products = await getProductsAsync();
+  const now = new Date().toISOString();
+  const newProduct: Product = {
+    ...productData,
+    id: 'prod_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    createdAt: now,
+    updatedAt: now,
+  };
+  const updated = [newProduct, ...products];
+  await saveProductsAsync(updated);
+  return newProduct;
+}
+
 export function updateProduct(id: string, productData: Partial<Product>): Product | null {
   const products = getProducts();
   const index = products.findIndex(p => p.id === id);
@@ -152,6 +176,22 @@ export function updateProduct(id: string, productData: Partial<Product>): Produc
   return updatedProduct;
 }
 
+export async function updateProductAsync(id: string, productData: Partial<Product>): Promise<Product | null> {
+  const products = await getProductsAsync();
+  const index = products.findIndex(p => p.id === id);
+  if (index === -1) return null;
+
+  const now = new Date().toISOString();
+  const updatedProduct = { 
+    ...products[index], 
+    ...productData,
+    updatedAt: now,
+  };
+  products[index] = updatedProduct;
+  await saveProductsAsync(products);
+  return updatedProduct;
+}
+
 export function deleteProduct(id: string): boolean {
   const products = getProducts();
   const filtered = products.filter(p => p.id !== id);
@@ -159,3 +199,12 @@ export function deleteProduct(id: string): boolean {
   saveProducts(filtered);
   return true;
 }
+
+export async function deleteProductAsync(id: string): Promise<boolean> {
+  const products = await getProductsAsync();
+  const filtered = products.filter(p => p.id !== id);
+  if (filtered.length === products.length) return false;
+  await saveProductsAsync(filtered);
+  return true;
+}
+

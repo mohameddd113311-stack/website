@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { updateProduct, deleteProduct } from '@/lib/products';
-import { isAdminAuthenticated, sanitizeInput } from '@/lib/auth';
+import { updateProductAsync, deleteProductAsync } from '@/lib/products';
+import { isAdminAuthenticated, sanitizeInput, sanitizeImageUrl } from '@/lib/auth';
 import { deleteProductFromSupabase } from '@/lib/supabase';
 
 export async function PUT(
@@ -30,7 +30,7 @@ export async function PUT(
     if (body.badge !== undefined) updateData.badge = body.badge ? sanitizeInput(body.badge) : undefined;
     if (body.popular !== undefined) updateData.popular = Boolean(body.popular);
     if (body.iconType) updateData.iconType = body.iconType;
-    if (body.imageUrl !== undefined) updateData.imageUrl = body.imageUrl ? sanitizeInput(body.imageUrl) : undefined;
+    if (body.imageUrl !== undefined) updateData.imageUrl = body.imageUrl ? sanitizeImageUrl(body.imageUrl) : undefined;
     if (body.whatsappMsg !== undefined) updateData.whatsappMsg = body.whatsappMsg ? sanitizeInput(body.whatsappMsg) : undefined;
     if (body.active !== undefined) updateData.active = Boolean(body.active);
 
@@ -42,7 +42,7 @@ export async function PUT(
         : [];
     }
 
-    const updated = updateProduct(id, updateData);
+    const updated = await updateProductAsync(id, updateData);
     if (!updated) {
       return NextResponse.json(
         { success: false, error: 'لم يتم العثور على المنتج المطلوب' },
@@ -74,7 +74,7 @@ export async function DELETE(
 
   const { id } = params;
   await deleteProductFromSupabase(id);
-  const deleted = deleteProduct(id);
+  const deleted = await deleteProductAsync(id);
 
   if (!deleted) {
     return NextResponse.json(
@@ -85,4 +85,5 @@ export async function DELETE(
 
   return NextResponse.json({ success: true, message: 'تم حذف المنتج بنجاح' });
 }
+
 

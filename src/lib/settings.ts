@@ -40,5 +40,24 @@ export function saveSiteSettings(settings: Partial<SiteSettings>): SiteSettings 
   return updated;
 }
 
+export async function saveSiteSettingsAsync(settings: Partial<SiteSettings>): Promise<SiteSettings> {
+  const current = await getSiteSettingsAsync();
+  
+  const parsedRate = settings.usdToEgpRate !== undefined && !isNaN(Number(settings.usdToEgpRate))
+    ? Number(settings.usdToEgpRate)
+    : current.usdToEgpRate || DEFAULT_SETTINGS.usdToEgpRate;
+
+  const updated: SiteSettings = {
+    whatsappNumber: settings.whatsappNumber ? settings.whatsappNumber.trim() : current.whatsappNumber,
+    facebookUrl: settings.facebookUrl ? settings.facebookUrl.trim() : current.facebookUrl,
+    usdToEgpRate: parsedRate > 0 ? parsedRate : 50,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await saveSettingsPersistent(updated);
+  return updated;
+}
+
+
 
 

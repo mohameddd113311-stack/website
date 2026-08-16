@@ -62,8 +62,21 @@ export async function isAdminAuthenticated(): Promise<boolean> {
 }
 
 export function sanitizeInput(input: string): string {
+  if (!input) return '';
   return input
     .trim()
     .replace(/[<>]/g, '')
     .substring(0, 1000);
 }
+
+export function sanitizeImageUrl(input: string): string {
+  if (!input) return '';
+  const trimmed = input.trim();
+  // Allow Base64 Data URLs (data:image/...) without length truncation
+  if (trimmed.startsWith('data:image/')) {
+    return trimmed.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  }
+  // Standard HTTP/HTTPS image URLs
+  return trimmed.replace(/[<>]/g, '').substring(0, 2048);
+}
+

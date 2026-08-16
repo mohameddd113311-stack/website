@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getProducts, saveProducts, Product } from '@/lib/products';
+import { getProductsAsync, saveProductsAsync, Product } from '@/lib/products';
 import { isAdminAuthenticated } from '@/lib/auth';
 
 export async function POST(request: Request) {
@@ -22,12 +22,13 @@ export async function POST(request: Request) {
       );
     }
 
-    saveProducts(products as Product[]);
+    await saveProductsAsync(products as Product[]);
+    const currentProducts = await getProductsAsync();
 
     return NextResponse.json({
       success: true,
       message: 'تم تزامن المنتجات بنجاح على السيرفر',
-      products: getProducts(),
+      products: currentProducts,
     });
   } catch (error) {
     console.error("Sync Products Error:", error);
@@ -37,3 +38,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

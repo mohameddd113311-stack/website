@@ -3,13 +3,13 @@ import Hero from '@/components/Hero';
 import ProductsSection from '@/components/ProductsSection';
 import WhyUs from '@/components/WhyUs';
 import FAQ from '@/components/FAQ';
-import { getProducts } from '@/lib/products';
+import { getProductsAsync } from '@/lib/products';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0; // Fresh products on demand
 
 export default async function HomePage() {
-  const products = getProducts().filter(p => p.active !== false);
+  const products = (await getProductsAsync()).filter(p => p.active !== false);
 
   return (
     <div className="space-y-12">
@@ -27,3 +27,4 @@ export default async function HomePage() {
     </div>
   );
 }
+

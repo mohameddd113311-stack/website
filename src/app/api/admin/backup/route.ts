@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getProducts, saveProducts, Product } from '@/lib/products';
-import { getSiteSettings, saveSiteSettings, SiteSettings } from '@/lib/settings';
+import { getProductsAsync, saveProductsAsync, Product } from '@/lib/products';
+import { getSiteSettingsAsync, saveSiteSettingsAsync, SiteSettings } from '@/lib/settings';
 import { isAdminAuthenticated } from '@/lib/auth';
 
 export async function GET() {
@@ -12,8 +12,8 @@ export async function GET() {
     );
   }
 
-  const products = getProducts();
-  const settings = getSiteSettings();
+  const products = await getProductsAsync();
+  const settings = await getSiteSettingsAsync();
 
   return NextResponse.json({
     success: true,
@@ -39,19 +39,22 @@ export async function POST(request: Request) {
 
     let restoredProductsCount = 0;
     if (Array.isArray(products) && products.length > 0) {
-      saveProducts(products as Product[]);
+      await saveProductsAsync(products as Product[]);
       restoredProductsCount = products.length;
     }
 
     if (settings && typeof settings === 'object') {
-      saveSiteSettings(settings as SiteSettings);
+      await saveSiteSettingsAsync(settings as SiteSettings);
     }
+
+    const currentProducts = await getProductsAsync();
+    const currentSettings = await getSiteSettingsAsync();
 
     return NextResponse.json({
       success: true,
       message: `تم استعادة النسخة الاحتياطية بنجاح (${restoredProductsCount} منتج)`,
-      products: getProducts(),
-      settings: getSiteSettings(),
+      products: currentProducts,
+      settings: currentSettings,
     });
   } catch (error) {
     console.error("Restore Backup Error:", error);
@@ -61,3 +64,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

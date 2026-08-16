@@ -1,7 +1,7 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { isAdminAuthenticated } from '@/lib/auth';
-import { getProducts } from '@/lib/products';
+import { getProductsAsync } from '@/lib/products';
 import AdminDashboard from '@/components/admin/AdminDashboard';
 
 export const revalidate = 0;
@@ -13,7 +13,8 @@ export default async function AdminPage() {
     redirect('/admin/login');
   }
 
-  const products = getProducts();
+  const products = await getProductsAsync();
 
   return <AdminDashboard initialProducts={products} />;
 }
+

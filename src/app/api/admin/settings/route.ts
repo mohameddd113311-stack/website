@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSiteSettingsAsync, saveSiteSettings } from '@/lib/settings';
+import { getSiteSettingsAsync, saveSiteSettingsAsync } from '@/lib/settings';
 import { isAdminAuthenticated, sanitizeInput } from '@/lib/auth';
 
 export async function GET() {
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { whatsappNumber, facebookUrl, usdToEgpRate } = body;
 
-    const updated = saveSiteSettings({
+    const updated = await saveSiteSettingsAsync({
       whatsappNumber: whatsappNumber ? sanitizeInput(whatsappNumber) : undefined,
       facebookUrl: facebookUrl ? sanitizeInput(facebookUrl) : undefined,
       usdToEgpRate: usdToEgpRate !== undefined && !isNaN(Number(usdToEgpRate)) ? Number(usdToEgpRate) : undefined,
@@ -35,4 +35,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
 

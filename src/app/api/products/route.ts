@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getProductsAsync, addProduct } from '@/lib/products';
-import { isAdminAuthenticated, sanitizeInput } from '@/lib/auth';
+import { getProductsAsync, addProductAsync } from '@/lib/products';
+import { isAdminAuthenticated, sanitizeInput, sanitizeImageUrl } from '@/lib/auth';
 
 export async function GET() {
   const products = await getProductsAsync();
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       ? features.split('\n').map(f => sanitizeInput(f)).filter(Boolean)
       : [];
 
-    const newProduct = addProduct({
+    const newProduct = await addProductAsync({
       name: sanitizeInput(name),
       category: sanitizeInput(category || 'ذكاء اصطناعي'),
       price: sanitizeInput(price),
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       badge: badge ? sanitizeInput(badge) : undefined,
       popular: Boolean(popular),
       iconType: ['gemini', 'chatgpt', 'capcut', 'custom'].includes(iconType) ? iconType : 'custom',
-      imageUrl: imageUrl ? sanitizeInput(imageUrl) : undefined,
+      imageUrl: imageUrl ? sanitizeImageUrl(imageUrl) : undefined,
       whatsappMsg: whatsappMsg ? sanitizeInput(whatsappMsg) : undefined,
       active: true
     });
@@ -58,3 +58,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
