@@ -14,7 +14,8 @@ export default function ProductCard({ product }: ProductCardProps) {
   const whatsappNumber = settings.whatsappNumber || '201021510826';
 
   const formattedPrice = formatPrice(product.price);
-  const formattedOriginalPrice = product.originalPrice ? formatPrice(product.originalPrice) : null;
+  const hasOriginalPrice = Boolean(product.originalPrice && product.originalPrice.trim() !== '');
+  const formattedOriginalPrice = hasOriginalPrice ? formatPrice(product.originalPrice!) : null;
 
   const translatedPeriod =
     product.billingPeriod === 'شهرياً' || product.billingPeriod === 'monthly'

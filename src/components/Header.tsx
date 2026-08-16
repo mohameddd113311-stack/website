@@ -148,7 +148,11 @@ export default function Header() {
           {/* Mobile Menu Button */}
           <div className="flex md:hidden items-center gap-2">
             <button
-              onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
+              onClick={() => {
+                const nextLang = lang === 'ar' ? 'en' : 'ar';
+                setLang(nextLang);
+                setCurrency(nextLang === 'ar' ? 'EGP' : 'USD');
+              }}
               className="px-2.5 py-1.5 rounded-xl glass-card text-xs font-bold text-purple-300 border border-slate-800 flex items-center gap-1"
             >
               <Globe className="w-3.5 h-3.5 text-cyan-400" />

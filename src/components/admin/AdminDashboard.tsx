@@ -303,7 +303,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const maxDim = 800;
+        const maxDim = 600;
         let width = img.width;
         let height = img.height;
 
@@ -322,7 +322,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
           setFormData(prev => ({ ...prev, imageUrl: compressedDataUrl }));
         } else {
           setFormData(prev => ({ ...prev, imageUrl: rawResult }));

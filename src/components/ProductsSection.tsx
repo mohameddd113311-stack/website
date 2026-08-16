@@ -37,7 +37,6 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
         const serverProducts: Product[] = data.products;
 
         if (localBackupProducts && localBackupProducts.length > 0) {
-          // Compare latest update timestamps
           const getLatestTimestamp = (list: Product[]) => {
             return list.reduce((max, p) => {
               const time = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
@@ -48,18 +47,18 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
           const serverLatest = getLatestTimestamp(serverProducts);
           const localLatest = getLatestTimestamp(localBackupProducts);
 
-          // If local backup has newer edits or more items than server, prefer local backup
-          if (localLatest > serverLatest || (localBackupProducts.length > serverProducts.length && serverLatest <= 1767225600000)) {
+          // Only prefer local backup if it has strictly newer edit timestamp than server
+          if (localLatest > serverLatest && localLatest > 0 && serverLatest > 0) {
             const activeOnly = localBackupProducts.filter((p: Product) => p.active !== false);
             setProducts(activeOnly);
             return;
           }
         }
 
-        // Otherwise use server products
+        // Otherwise use server products as primary authoritative source
         const activeOnly = serverProducts.filter((p: Product) => p.active !== false);
         setProducts(activeOnly);
-        if (typeof window !== 'undefined' && serverProducts.length > 0) {
+        if (typeof window !== 'undefined') {
           try {
             localStorage.setItem('ai_studio_products_backup', JSON.stringify(serverProducts));
           } catch {}

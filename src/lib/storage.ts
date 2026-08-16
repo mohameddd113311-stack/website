@@ -182,6 +182,15 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
   // 1. Try Prisma DB save if DATABASE_URL exists
   if (process.env.DATABASE_URL) {
     try {
+      const activeIds = products.map(p => p.id);
+      if (activeIds.length > 0) {
+        await prisma.product.deleteMany({
+          where: { id: { notIn: activeIds } },
+        });
+      } else {
+        await prisma.product.deleteMany({});
+      }
+
       // Clear and upsert products into DB
       for (const p of products) {
         await prisma.product.upsert({

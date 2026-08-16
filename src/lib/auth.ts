@@ -10,15 +10,13 @@ export function verifyAdminCredentials(username?: string, password?: string): bo
 
   if (!username || !password) return false;
 
-  const userMatch = crypto.timingSafeEqual(
-    Buffer.from(username),
-    Buffer.from(expectedUsername)
-  );
+  const userBuf = Buffer.from(username);
+  const expectedUserBuf = Buffer.from(expectedUsername);
+  const passBuf = Buffer.from(password);
+  const expectedPassBuf = Buffer.from(expectedPassword);
 
-  const passMatch = crypto.timingSafeEqual(
-    Buffer.from(password),
-    Buffer.from(expectedPassword)
-  );
+  const userMatch = userBuf.length === expectedUserBuf.length && crypto.timingSafeEqual(userBuf, expectedUserBuf);
+  const passMatch = passBuf.length === expectedPassBuf.length && crypto.timingSafeEqual(passBuf, expectedPassBuf);
 
   return userMatch && passMatch;
 }
@@ -66,7 +64,7 @@ export function sanitizeInput(input: string): string {
   return input
     .trim()
     .replace(/[<>]/g, '')
-    .substring(0, 1000);
+    .substring(0, 10000);
 }
 
 export function sanitizeImageUrl(input: string): string {
