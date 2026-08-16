@@ -68,13 +68,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
 
 
 
-  // Keep local products state synced with initialProducts prop when server re-renders
-  useEffect(() => {
-    if (initialProducts && initialProducts.length > 0) {
-      setProducts(initialProducts);
-      saveProductsToLocalBackup(initialProducts);
-    }
-  }, [initialProducts]);
+
 
   // Fetch latest products from server API on mount with cache busting
   useEffect(() => {

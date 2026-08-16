@@ -14,11 +14,7 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
   const { t } = useApp();
   const [products, setProducts] = useState<Product[]>(initialProducts);
 
-  useEffect(() => {
-    if (initialProducts && initialProducts.length > 0) {
-      setProducts(initialProducts);
-    }
-  }, [initialProducts]);
+
 
   const syncProductsFromSources = async () => {
     let localBackupProducts: Product[] | null = null;
