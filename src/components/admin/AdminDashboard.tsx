@@ -68,9 +68,17 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
 
 
 
-  // Fetch latest products from server API on mount, with localStorage fallback
+  // Keep local products state synced with initialProducts prop when server re-renders
   useEffect(() => {
-    fetch('/api/products')
+    if (initialProducts && initialProducts.length > 0) {
+      setProducts(initialProducts);
+      saveProductsToLocalBackup(initialProducts);
+    }
+  }, [initialProducts]);
+
+  // Fetch latest products from server API on mount with cache busting
+  useEffect(() => {
+    fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (data.success && Array.isArray(data.products) && data.products.length > 0) {

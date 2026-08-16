@@ -3,6 +3,9 @@ import { updateProductAsync, deleteProductAsync } from '@/lib/products';
 import { isAdminAuthenticated, sanitizeInput, sanitizeImageUrl } from '@/lib/auth';
 import { deleteProductFromSupabase } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }

@@ -61,7 +61,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Fetch latest settings from server
-    fetch('/api/admin/settings')
+    fetch(`/api/admin/settings?t=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (data.success && data.settings) {

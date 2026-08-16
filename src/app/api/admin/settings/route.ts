@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSiteSettingsAsync, saveSiteSettingsAsync } from '@/lib/settings';
 import { isAdminAuthenticated, sanitizeInput } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const settings = await getSiteSettingsAsync();
   return NextResponse.json({ success: true, settings });

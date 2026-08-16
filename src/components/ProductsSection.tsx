@@ -14,6 +14,12 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
   const { t } = useApp();
   const [products, setProducts] = useState<Product[]>(initialProducts);
 
+  useEffect(() => {
+    if (initialProducts && initialProducts.length > 0) {
+      setProducts(initialProducts);
+    }
+  }, [initialProducts]);
+
   const syncProductsFromSources = async () => {
     let localBackupProducts: Product[] | null = null;
 
@@ -30,7 +36,7 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
     }
 
     try {
-      const res = await fetch('/api/products');
+      const res = await fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
 
       if (data.success && Array.isArray(data.products)) {

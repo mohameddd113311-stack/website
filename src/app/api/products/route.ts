@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getProductsAsync, addProductAsync } from '@/lib/products';
 import { isAdminAuthenticated, sanitizeInput, sanitizeImageUrl } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const products = await getProductsAsync();
   return NextResponse.json({ success: true, products });
