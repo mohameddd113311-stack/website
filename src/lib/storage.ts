@@ -3,6 +3,12 @@ import path from 'path';
 import { Product, INITIAL_PRODUCTS } from './products';
 import { SiteSettings, DEFAULT_SETTINGS } from './settings';
 import { prisma } from './db';
+import {
+  fetchProductsFromSupabase,
+  saveProductToSupabase,
+  fetchSettingsFromSupabase,
+  saveSettingsToSupabase,
+} from './supabase';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
@@ -12,12 +18,20 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 let memoryProducts: Product[] | null = null;
 let memorySettings: SiteSettings | null = null;
 
-function ensureDataDir() {
+function ensureDataFilesExist() {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-  } catch {}
+    if (!fs.existsSync(PRODUCTS_FILE)) {
+      fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(INITIAL_PRODUCTS, null, 2), 'utf-8');
+    }
+    if (!fs.existsSync(SETTINGS_FILE)) {
+      fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2), 'utf-8');
+    }
+  } catch (e) {
+    console.warn("Data directory initialization warning:", e);
+  }
 }
 
 // Helpers for Upstash Redis / Vercel KV REST API if env variables are provided
@@ -63,18 +77,13 @@ async function setKvData<T>(key: string, value: T): Promise<boolean> {
   }
 }
 
-import {
-  fetchProductsFromSupabase,
-  saveProductToSupabase,
-  fetchSettingsFromSupabase,
-  saveSettingsToSupabase,
-} from './supabase';
-
 /**
  * Load products from Supabase first if configured,
- * then Database (Prisma), then Cloud KV, then local filesystem, then memory, then initial defaults.
+ * then Database (Prisma), then Cloud KV, then local filesystem (data/products.json), then memory, then initial defaults.
  */
 export async function loadProductsAsync(): Promise<Product[]> {
+  ensureDataFilesExist();
+
   // 0. Try Supabase Database
   const supabaseProducts = await fetchProductsFromSupabase();
   if (supabaseProducts && supabaseProducts.length > 0) {
@@ -111,10 +120,9 @@ export async function loadProductsAsync(): Promise<Product[]> {
         return mapped;
       }
     } catch (e) {
-      console.warn("Prisma DB read error, falling back to KV/File:", e);
+      console.warn("Prisma DB read error, falling back to File/Memory:", e);
     }
   }
-
 
   // 2. Try Cloud KV
   const kvProducts = await getKvData<Product[]>('ai_studio_products');
@@ -123,14 +131,8 @@ export async function loadProductsAsync(): Promise<Product[]> {
     return kvProducts;
   }
 
-  // 3. Try Memory
-  if (memoryProducts && memoryProducts.length > 0) {
-    return memoryProducts;
-  }
-
-  // 4. Try Filesystem
+  // 3. Try Local Filesystem (Primary local persistent store)
   try {
-    ensureDataDir();
     if (fs.existsSync(PRODUCTS_FILE)) {
       const fileData = fs.readFileSync(PRODUCTS_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
@@ -139,7 +141,14 @@ export async function loadProductsAsync(): Promise<Product[]> {
         return memoryProducts;
       }
     }
-  } catch {}
+  } catch (e) {
+    console.warn("Filesystem products read error:", e);
+  }
+
+  // 4. Try Memory Cache
+  if (memoryProducts && memoryProducts.length > 0) {
+    return memoryProducts;
+  }
 
   memoryProducts = [...INITIAL_PRODUCTS];
   return memoryProducts;
@@ -149,11 +158,9 @@ export async function loadProductsAsync(): Promise<Product[]> {
  * Synchronous product getter for instant render fallback
  */
 export function loadProductsSync(): Product[] {
-  if (memoryProducts && memoryProducts.length > 0) {
-    return memoryProducts;
-  }
+  ensureDataFilesExist();
+
   try {
-    ensureDataDir();
     if (fs.existsSync(PRODUCTS_FILE)) {
       const fileData = fs.readFileSync(PRODUCTS_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
@@ -162,7 +169,13 @@ export function loadProductsSync(): Product[] {
         return memoryProducts;
       }
     }
-  } catch {}
+  } catch (e) {
+    console.warn("Filesystem products sync read error:", e);
+  }
+
+  if (memoryProducts && memoryProducts.length > 0) {
+    return memoryProducts;
+  }
 
   memoryProducts = [...INITIAL_PRODUCTS];
   return memoryProducts;
@@ -174,12 +187,20 @@ export function loadProductsSync(): Product[] {
 export async function saveProductsPersistent(products: Product[]): Promise<boolean> {
   memoryProducts = [...products];
 
-  // 0. Try Supabase save
+  // 1. Filesystem write (immediate local disk persistence)
+  try {
+    ensureDataFilesExist();
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn("Filesystem write skipped (Serverless environment)", e);
+  }
+
+  // 2. Supabase save if configured
   for (const p of products) {
     await saveProductToSupabase(p);
   }
 
-  // 1. Try Prisma DB save if DATABASE_URL exists
+  // 3. Prisma DB save if DATABASE_URL exists
   if (process.env.DATABASE_URL) {
     try {
       const activeIds = products.map(p => p.id);
@@ -191,7 +212,6 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
         await prisma.product.deleteMany({});
       }
 
-      // Clear and upsert products into DB
       for (const p of products) {
         await prisma.product.upsert({
           where: { id: p.id },
@@ -233,16 +253,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
     }
   }
 
-
-  // 2. Try Filesystem write
-  try {
-    ensureDataDir();
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
-  } catch (e) {
-    console.warn("Filesystem write skipped (Serverless environment)", e);
-  }
-
-  // 3. Try Cloud KV store if configured
+  // 4. Cloud KV store if configured
   await setKvData('ai_studio_products', products);
 
   return true;
@@ -252,6 +263,8 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
  * Load site settings from Supabase, Prisma DB, Cloud KV, filesystem, memory, or defaults.
  */
 export async function loadSettingsAsync(): Promise<SiteSettings> {
+  ensureDataFilesExist();
+
   const supabaseSettings = await fetchSettingsFromSupabase();
   if (supabaseSettings) {
     memorySettings = supabaseSettings;
@@ -277,7 +290,6 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
     }
   }
 
-
   const kvSettings = await getKvData<SiteSettings>('ai_studio_settings');
   if (kvSettings && typeof kvSettings === 'object') {
     memorySettings = {
@@ -289,10 +301,8 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
     return memorySettings;
   }
 
-  if (memorySettings) return memorySettings;
-
+  // Filesystem check
   try {
-    ensureDataDir();
     if (fs.existsSync(SETTINGS_FILE)) {
       const fileData = fs.readFileSync(SETTINGS_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
@@ -306,7 +316,11 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
         return memorySettings;
       }
     }
-  } catch {}
+  } catch (e) {
+    console.warn("Filesystem settings read error:", e);
+  }
+
+  if (memorySettings) return memorySettings;
 
   memorySettings = { ...DEFAULT_SETTINGS };
   return memorySettings;
@@ -316,10 +330,9 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
  * Synchronous settings getter
  */
 export function loadSettingsSync(): SiteSettings {
-  if (memorySettings) return memorySettings;
+  ensureDataFilesExist();
 
   try {
-    ensureDataDir();
     if (fs.existsSync(SETTINGS_FILE)) {
       const fileData = fs.readFileSync(SETTINGS_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
@@ -333,7 +346,11 @@ export function loadSettingsSync(): SiteSettings {
         return memorySettings;
       }
     }
-  } catch {}
+  } catch (e) {
+    console.warn("Filesystem settings sync read error:", e);
+  }
+
+  if (memorySettings) return memorySettings;
 
   memorySettings = { ...DEFAULT_SETTINGS };
   return memorySettings;
@@ -345,10 +362,16 @@ export function loadSettingsSync(): SiteSettings {
 export async function saveSettingsPersistent(settings: SiteSettings): Promise<SiteSettings> {
   memorySettings = { ...settings };
 
+  try {
+    ensureDataFilesExist();
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn("Filesystem write skipped (Serverless environment)", e);
+  }
+
   await saveSettingsToSupabase(settings);
 
   if (process.env.DATABASE_URL) {
-
     try {
       await prisma.siteSetting.upsert({
         where: { id: 'default' },
@@ -367,13 +390,6 @@ export async function saveSettingsPersistent(settings: SiteSettings): Promise<Si
     } catch (e) {
       console.warn("Prisma DB settings write error:", e);
     }
-  }
-
-  try {
-    ensureDataDir();
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
-  } catch (e) {
-    console.warn("Filesystem write skipped (Serverless environment)", e);
   }
 
   await setKvData('ai_studio_settings', settings);
