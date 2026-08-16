@@ -135,3 +135,37 @@ export async function saveSettingsToSupabase(settings: SiteSettings): Promise<bo
     return false;
   }
 }
+
+export async function uploadImageToSupabaseStorage(
+  fileBuffer: Buffer,
+  fileName: string,
+  mimeType: string
+): Promise<string | null> {
+  if (!supabase) return null;
+  try {
+    const bucketName = process.env.SUPABASE_STORAGE_BUCKET || 'product-images';
+    const cleanFileName = `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+
+    const { error } = await supabase.storage
+      .from(bucketName)
+      .upload(cleanFileName, fileBuffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (error) {
+      console.warn("Supabase Storage upload error:", error);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(cleanFileName);
+
+    return publicUrlData.publicUrl || null;
+  } catch (e) {
+    console.warn("Supabase Storage upload exception:", e);
+    return null;
+  }
+}
+

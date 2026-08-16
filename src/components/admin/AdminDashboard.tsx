@@ -255,8 +255,10 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
     setIsModalOpen(true);
   };
 
-  // Image Upload handler with Canvas Compression to ensure light & fast Base64 Data URL
-  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Image Upload handler: First uploads to Cloud Storage (/api/admin/upload), with Canvas compression fallback
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -265,10 +267,37 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
       return;
     }
 
+    setUploadingImage(true);
+    setError('');
+
+    try {
+      // 1. Attempt uploading directly to Cloud Storage API endpoint
+      const bodyFormData = new FormData();
+      bodyFormData.append('file', file);
+
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        body: bodyFormData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success && data.url) {
+        setFormData(prev => ({ ...prev, imageUrl: data.url }));
+        setUploadingImage(false);
+        return;
+      }
+    } catch (err) {
+      console.warn("Cloud storage endpoint unavailable, using direct optimization fallback", err);
+    }
+
+    // 2. Fallback: Optimize and compress locally using Canvas
     const reader = new FileReader();
     reader.onload = (event) => {
       const rawResult = event.target?.result as string;
-      if (!rawResult) return;
+      if (!rawResult) {
+        setUploadingImage(false);
+        return;
+      }
 
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -298,14 +327,17 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
         } else {
           setFormData(prev => ({ ...prev, imageUrl: rawResult }));
         }
+        setUploadingImage(false);
       };
       img.onerror = () => {
         setFormData(prev => ({ ...prev, imageUrl: rawResult }));
+        setUploadingImage(false);
       };
       img.src = rawResult;
     };
     reader.readAsDataURL(file);
   };
+
 
 
   const handleSubmitProduct = async (e: React.FormEvent) => {
@@ -901,12 +933,15 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] text-slate-400 mb-1">رفع صورة من جهازك</label>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      {uploadingImage ? 'جاري رفع الصورة للسحابة...' : 'رفع صورة من جهازك'}
+                    </label>
                     <input
                       type="file"
                       accept="image/*"
+                      disabled={uploadingImage}
                       onChange={handleImageFileUpload}
-                      className="w-full text-xs text-slate-300 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
+                      className="w-full text-xs text-slate-300 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer disabled:opacity-50"
                     />
                   </div>
 
