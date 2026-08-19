@@ -31,6 +31,12 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
   };
 
   useEffect(() => {
+    if (Array.isArray(initialProducts) && initialProducts.length > 0) {
+      setProducts(initialProducts);
+    }
+  }, [initialProducts]);
+
+  useEffect(() => {
     syncProductsFromSources();
 
     const handleUpdate = () => {

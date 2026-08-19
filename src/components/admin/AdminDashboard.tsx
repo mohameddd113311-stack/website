@@ -71,6 +71,12 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
 
 
 
+  useEffect(() => {
+    if (Array.isArray(initialProducts) && initialProducts.length > 0) {
+      setProducts(initialProducts);
+    }
+  }, [initialProducts]);
+
   // Fetch latest products from server API on mount with cache busting
   useEffect(() => {
     fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' })
