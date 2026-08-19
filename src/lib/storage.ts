@@ -207,8 +207,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
         });
       }
     } catch (e) {
-      console.error("Prisma DB save error:", e);
-      throw e;
+      console.warn("Prisma DB save error:", e);
     }
   }
 
@@ -329,8 +328,7 @@ export async function saveSettingsPersistent(settings: SiteSettings): Promise<Si
         },
       });
     } catch (e) {
-      console.error("Prisma DB settings write error:", e);
-      throw e;
+      console.warn("Prisma DB settings write error:", e);
     }
   }
 
