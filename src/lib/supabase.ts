@@ -2,14 +2,20 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Product } from './products';
 import { SiteSettings } from './settings';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  process.env.SUPABASE_URL ||
+  'https://fcerrorhqphaggnqyyiu.supabase.co';
 
-export const supabase: SupabaseClient | null =
-  supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const supabaseKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  'sb_publishable_dRMbXNN3PaDsQYZXRh4axw_YwyfO5wF';
+
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
 
 export async function fetchProductsFromSupabase(): Promise<Product[] | null> {
-  if (!supabase) return null;
   try {
     const { data, error } = await supabase
       .from('products')
@@ -47,7 +53,6 @@ export async function fetchProductsFromSupabase(): Promise<Product[] | null> {
 }
 
 export async function saveProductToSupabase(product: Product): Promise<boolean> {
-  if (!supabase) return false;
   try {
     const payload = {
       id: product.id,
@@ -81,7 +86,6 @@ export async function saveProductToSupabase(product: Product): Promise<boolean> 
 }
 
 export async function deleteProductFromSupabase(id: string): Promise<boolean> {
-  if (!supabase) return false;
   try {
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) {
@@ -96,7 +100,6 @@ export async function deleteProductFromSupabase(id: string): Promise<boolean> {
 }
 
 export async function fetchSettingsFromSupabase(): Promise<SiteSettings | null> {
-  if (!supabase) return null;
   try {
     const { data, error } = await supabase
       .from('site_settings')
@@ -118,7 +121,6 @@ export async function fetchSettingsFromSupabase(): Promise<SiteSettings | null> 
 }
 
 export async function saveSettingsToSupabase(settings: SiteSettings): Promise<boolean> {
-  if (!supabase) return false;
   try {
     const payload = {
       id: 'default',
@@ -141,7 +143,6 @@ export async function uploadImageToSupabaseStorage(
   fileName: string,
   mimeType: string
 ): Promise<string | null> {
-  if (!supabase) return null;
   try {
     const bucketName = process.env.SUPABASE_STORAGE_BUCKET || 'product-images';
     const cleanFileName = `${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '')}`;
@@ -168,4 +169,3 @@ export async function uploadImageToSupabaseStorage(
     return null;
   }
 }
-
