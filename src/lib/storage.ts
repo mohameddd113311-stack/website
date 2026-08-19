@@ -185,7 +185,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
       }
 
       for (const p of products) {
-        const featuresStr = typeof p.features === 'string' ? p.features : JSON.stringify(p.features || []);
+        const featuresJson = parseFeatures(p.features);
         await prisma.product.upsert({
           where: { id: p.id },
           update: {
@@ -196,7 +196,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
             stockQuantity: p.stockQuantity ?? 999,
             billingPeriod: p.billingPeriod,
             description: p.description,
-            features: featuresStr,
+            features: featuresJson,
             badge: p.badge || null,
             popular: p.popular || false,
             imageUrl: p.imageUrl || null,
@@ -213,7 +213,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
             stockQuantity: p.stockQuantity ?? 999,
             billingPeriod: p.billingPeriod,
             description: p.description,
-            features: featuresStr,
+            features: featuresJson,
             badge: p.badge || null,
             popular: p.popular || false,
             imageUrl: p.imageUrl || null,

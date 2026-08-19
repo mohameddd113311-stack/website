@@ -58,7 +58,7 @@ export async function saveProductToSupabase(product: Product): Promise<boolean> 
       stock_quantity: (product as any).stockQuantity ?? 999,
       billing_period: product.billingPeriod,
       description: product.description,
-      features: JSON.stringify(product.features || []),
+      features: Array.isArray(product.features) ? product.features : typeof product.features === 'string' ? JSON.parse(product.features) : [],
       badge: product.badge || null,
       popular: product.popular || false,
       image_url: product.imageUrl || null,

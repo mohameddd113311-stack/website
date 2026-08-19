@@ -16,7 +16,7 @@ model Product {
   stockQuantity Int      @default(999) @map("stock_quantity")
   billingPeriod String   @default("شهرياً") @map("billing_period")
   description   String
-  features      String   // JSON stringified string[]
+  features      Json     // Native Jsonb array
   badge         String?
   popular       Boolean  @default(false)
   imageUrl      String?  @map("image_url")
