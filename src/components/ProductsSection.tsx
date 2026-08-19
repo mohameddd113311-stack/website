@@ -5,8 +5,7 @@ import ProductCard from '@/components/ProductCard';
 import { Product } from '@/lib/products';
 import { Sparkles, Layers } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-
-import { getStoredProducts, setStoredProducts } from '@/lib/clientStorage';
+import { setStoredProducts } from '@/lib/clientStorage';
 
 interface ProductsSectionProps {
   initialProducts: Product[];
@@ -14,17 +13,14 @@ interface ProductsSectionProps {
 
 export default function ProductsSection({ initialProducts }: ProductsSectionProps) {
   const { t } = useApp();
-  const [products, setProducts] = useState<Product[]>(() => {
-    const cached = getStoredProducts();
-    return cached && cached.length > 0 ? cached.filter(p => p.active !== false) : initialProducts;
-  });
+  const [products, setProducts] = useState<Product[]>(initialProducts);
 
   const syncProductsFromSources = async () => {
     try {
       const res = await fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
 
-      if (data.success && Array.isArray(data.products)) {
+      if (data.success && Array.isArray(data.products) && data.products.length > 0) {
         const activeOnly = data.products.filter((p: Product) => p.active !== false);
         setProducts(activeOnly);
         setStoredProducts(data.products);
@@ -35,18 +31,9 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
   };
 
   useEffect(() => {
-    const cached = getStoredProducts();
-    if (cached && cached.length > 0) {
-      setProducts(cached.filter(p => p.active !== false));
-    }
-
     syncProductsFromSources();
 
     const handleUpdate = () => {
-      const freshCached = getStoredProducts();
-      if (freshCached && freshCached.length > 0) {
-        setProducts(freshCached.filter(p => p.active !== false));
-      }
       syncProductsFromSources();
     };
 
