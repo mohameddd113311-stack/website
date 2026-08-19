@@ -6,89 +6,56 @@ import { Product } from '@/lib/products';
 import { Sparkles, Layers } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
+import { getStoredProducts, setStoredProducts } from '@/lib/clientStorage';
+
 interface ProductsSectionProps {
   initialProducts: Product[];
 }
 
 export default function ProductsSection({ initialProducts }: ProductsSectionProps) {
   const { t } = useApp();
-  const [products, setProducts] = useState<Product[]>(initialProducts);
-
-
+  const [products, setProducts] = useState<Product[]>(() => {
+    const cached = getStoredProducts();
+    return cached && cached.length > 0 ? cached.filter(p => p.active !== false) : initialProducts;
+  });
 
   const syncProductsFromSources = async () => {
-    let localBackupProducts: Product[] | null = null;
-
-    if (typeof window !== 'undefined') {
-      const savedLocal = localStorage.getItem('ai_studio_products_backup');
-      if (savedLocal) {
-        try {
-          const parsed = JSON.parse(savedLocal);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            localBackupProducts = parsed;
-          }
-        } catch {}
-      }
-    }
-
     try {
       const res = await fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
 
       if (data.success && Array.isArray(data.products)) {
-        const serverProducts: Product[] = data.products;
-
-        if (localBackupProducts && localBackupProducts.length > 0) {
-          const getLatestTimestamp = (list: Product[]) => {
-            return list.reduce((max, p) => {
-              const time = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
-              return time > max ? time : max;
-            }, 0);
-          };
-
-          const serverLatest = getLatestTimestamp(serverProducts);
-          const localLatest = getLatestTimestamp(localBackupProducts);
-
-          // Only prefer local backup if it has strictly newer edit timestamp than server
-          if (localLatest > serverLatest && localLatest > 0 && serverLatest > 0) {
-            const activeOnly = localBackupProducts.filter((p: Product) => p.active !== false);
-            setProducts(activeOnly);
-            return;
-          }
-        }
-
-        // Otherwise use server products as primary authoritative source
-        const activeOnly = serverProducts.filter((p: Product) => p.active !== false);
+        const activeOnly = data.products.filter((p: Product) => p.active !== false);
         setProducts(activeOnly);
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.setItem('ai_studio_products_backup', JSON.stringify(serverProducts));
-          } catch {}
-        }
-      } else if (localBackupProducts && localBackupProducts.length > 0) {
-        const activeOnly = localBackupProducts.filter((p: Product) => p.active !== false);
-        setProducts(activeOnly);
+        setStoredProducts(data.products);
       }
     } catch (err) {
-      if (localBackupProducts && localBackupProducts.length > 0) {
-        const activeOnly = localBackupProducts.filter((p: Product) => p.active !== false);
-        setProducts(activeOnly);
-      }
+      console.warn("Error syncing products from server:", err);
     }
   };
 
   useEffect(() => {
+    const cached = getStoredProducts();
+    if (cached && cached.length > 0) {
+      setProducts(cached.filter(p => p.active !== false));
+    }
+
     syncProductsFromSources();
 
-    // Listen for custom products_updated event and window storage event
     const handleUpdate = () => {
+      const freshCached = getStoredProducts();
+      if (freshCached && freshCached.length > 0) {
+        setProducts(freshCached.filter(p => p.active !== false));
+      }
       syncProductsFromSources();
     };
 
+    window.addEventListener('ai_studio_data_changed', handleUpdate);
     window.addEventListener('products_updated', handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
     return () => {
+      window.removeEventListener('ai_studio_data_changed', handleUpdate);
       window.removeEventListener('products_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };

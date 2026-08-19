@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import { useApp } from '@/context/AppContext';
+import { getStoredProducts, setStoredProducts, setStoredSettings } from '@/lib/clientStorage';
 
 interface AdminDashboardProps {
   initialProducts: Product[];
@@ -77,39 +78,15 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
       .then(data => {
         if (data.success && Array.isArray(data.products) && data.products.length > 0) {
           setProducts(data.products);
-          saveProductsToLocalBackup(data.products);
-        } else {
-          const savedLocal = localStorage.getItem('ai_studio_products_backup');
-          if (savedLocal) {
-            try {
-              const parsed = JSON.parse(savedLocal);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                setProducts(parsed);
-              }
-            } catch {}
-          }
         }
       })
-      .catch(() => {
-        const savedLocal = localStorage.getItem('ai_studio_products_backup');
-        if (savedLocal) {
-          try {
-            const parsed = JSON.parse(savedLocal);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setProducts(parsed);
-            }
-          } catch {}
-        }
-      });
+      .catch(() => {});
   }, []);
 
-  const saveProductsToLocalBackup = (newProducts: Product[]) => {
-    try {
-      localStorage.setItem('ai_studio_products_backup', JSON.stringify(newProducts));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('products_updated'));
-      }
-    } catch {}
+  const notifyProductsUpdated = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('products_updated'));
+    }
   };
 
   const handleDownloadBackup = async () => {
@@ -171,7 +148,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
       if (res.ok && data.success) {
         if (Array.isArray(data.products)) {
           setProducts(data.products);
-          saveProductsToLocalBackup(data.products);
+          notifyProductsUpdated();
         }
         if (data.settings) {
           updateSettings(data.settings);
@@ -376,7 +353,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
           setProducts(updatedList);
           setSuccess('تم إضافة المنتج بنجاح وحفظ البيانات للزوار');
         }
-        saveProductsToLocalBackup(updatedList);
+        notifyProductsUpdated();
         setIsModalOpen(false);
         router.refresh();
       } else {
@@ -398,7 +375,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
       if (res.ok && data.success) {
         const updatedList = products.filter(p => p.id !== id);
         setProducts(updatedList);
-        saveProductsToLocalBackup(updatedList);
+        notifyProductsUpdated();
         setSuccess('تم حذف المنتج بنجاح');
         router.refresh();
       } else {

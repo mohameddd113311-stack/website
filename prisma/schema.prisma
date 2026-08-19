@@ -13,6 +13,7 @@ model Product {
   category      String   @default("ذكاء اصطناعي")
   price         String
   originalPrice String?
+  stockQuantity Int      @default(999)
   billingPeriod String   @default("شهرياً")
   description   String
   features      String   // JSON stringified string[]

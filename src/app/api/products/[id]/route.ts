@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateProductAsync, deleteProductAsync } from '@/lib/products';
 import { isAdminAuthenticated, sanitizeInput, sanitizeImageUrl } from '@/lib/auth';
-import { deleteProductFromSupabase } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -76,7 +75,6 @@ export async function DELETE(
   }
 
   const { id } = params;
-  await deleteProductFromSupabase(id);
   const deleted = await deleteProductAsync(id);
 
   if (!deleted) {
