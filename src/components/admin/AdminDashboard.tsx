@@ -78,6 +78,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
       .then(data => {
         if (data.success && Array.isArray(data.products) && data.products.length > 0) {
           setProducts(data.products);
+          setStoredProducts(data.products);
         }
       })
       .catch(() => {});
@@ -347,10 +348,12 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
         if (editingProduct) {
           updatedList = products.map(p => p.id === editingProduct.id ? data.product : p);
           setProducts(updatedList);
+          setStoredProducts(updatedList);
           setSuccess('تم تعديل المنتج بنجاح وحفظ البيانات للزوار');
         } else {
           updatedList = [data.product, ...products];
           setProducts(updatedList);
+          setStoredProducts(updatedList);
           setSuccess('تم إضافة المنتج بنجاح وحفظ البيانات للزوار');
         }
         notifyProductsUpdated();
@@ -375,6 +378,7 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
       if (res.ok && data.success) {
         const updatedList = products.filter(p => p.id !== id);
         setProducts(updatedList);
+        setStoredProducts(updatedList);
         notifyProductsUpdated();
         setSuccess('تم حذف المنتج بنجاح');
         router.refresh();
