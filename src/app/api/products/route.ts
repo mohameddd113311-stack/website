@@ -53,10 +53,10 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, product: newProduct });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Add Product Error:", error);
     return NextResponse.json(
-      { success: false, error: 'حدث خطأ أثناء إضافة المنتج' },
+      { success: false, error: error?.message || 'حدث خطأ أثناء إضافة المنتج' },
       { status: 500 }
     );
   }

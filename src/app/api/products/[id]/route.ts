@@ -53,10 +53,10 @@ export async function PUT(
     }
 
     return NextResponse.json({ success: true, product: updated });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Update Product Error:", error);
     return NextResponse.json(
-      { success: false, error: 'حدث خطأ أثناء تعديل المنتج' },
+      { success: false, error: error?.message || 'حدث خطأ أثناء تعديل المنتج' },
       { status: 500 }
     );
   }
