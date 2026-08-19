@@ -3,6 +3,13 @@ import path from 'path';
 import { Product, INITIAL_PRODUCTS } from './products';
 import { SiteSettings, DEFAULT_SETTINGS } from './settings';
 import { prisma } from './db';
+import {
+  fetchProductsFromSupabase,
+  saveProductToSupabase,
+  deleteProductFromSupabase,
+  fetchSettingsFromSupabase,
+  saveSettingsToSupabase,
+} from './supabase';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
@@ -46,11 +53,18 @@ function parseFeatures(features: any): string[] {
 }
 
 /**
- * Load products from PostgreSQL (Prisma) when DATABASE_URL is available,
- * otherwise load from local JSON file. Automatically seeds initial products if DB is empty.
+ * Load products from Supabase (REST API or Prisma),
+ * otherwise load from local JSON file.
  */
 export async function loadProductsAsync(): Promise<Product[]> {
-  // 1. Primary: Prisma PostgreSQL (Supabase / PostgreSQL)
+  // 1. Primary: Supabase REST API
+  const supabaseProducts = await fetchProductsFromSupabase();
+  if (supabaseProducts && supabaseProducts.length > 0) {
+    memoryProducts = supabaseProducts;
+    return supabaseProducts;
+  }
+
+  // 2. Secondary: Prisma PostgreSQL
   if (process.env.DATABASE_URL) {
     try {
       const dbProducts = await prisma.product.findMany({
@@ -79,20 +93,12 @@ export async function loadProductsAsync(): Promise<Product[]> {
         memoryProducts = mapped;
         return mapped;
       }
-      
-      // If Supabase table exists but has 0 products, seed initial products into Supabase
-      if (dbProducts && dbProducts.length === 0) {
-        console.log("Database table 'products' is empty. Seeding initial products to Supabase...");
-        await saveProductsPersistent(INITIAL_PRODUCTS);
-        memoryProducts = [...INITIAL_PRODUCTS];
-        return memoryProducts;
-      }
     } catch (e) {
       console.warn("Prisma PostgreSQL products read error, falling back to local file:", e);
     }
   }
 
-  // 2. Fallback: Local Filesystem JSON
+  // 3. Fallback: Local Filesystem JSON
   ensureDataFilesExist();
   try {
     if (fs.existsSync(PRODUCTS_FILE)) {
@@ -107,7 +113,7 @@ export async function loadProductsAsync(): Promise<Product[]> {
     console.warn("Filesystem products read error:", e);
   }
 
-  // 3. Fallback: Memory or Initial Defaults
+  // 4. Fallback: Memory or Initial Defaults
   if (memoryProducts !== null && Array.isArray(memoryProducts) && memoryProducts.length > 0) {
     return memoryProducts;
   }
@@ -150,7 +156,7 @@ export function loadProductsSync(): Product[] {
 }
 
 /**
- * Save products to PostgreSQL (Prisma) and local filesystem.
+ * Save products to Supabase (REST API + Prisma PostgreSQL) and local filesystem.
  */
 export async function saveProductsPersistent(products: Product[]): Promise<boolean> {
   memoryProducts = [...products];
@@ -163,7 +169,12 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
     console.warn("Filesystem write skipped (Serverless environment)", e);
   }
 
-  // 2. Prisma PostgreSQL save if DATABASE_URL exists
+  // 2. Save directly to Supabase REST API (HTTPS port 443)
+  for (const p of products) {
+    await saveProductToSupabase(p);
+  }
+
+  // 3. Save to Prisma PostgreSQL if DATABASE_URL exists
   if (process.env.DATABASE_URL) {
     try {
       const activeIds = products.map(p => p.id);
@@ -223,9 +234,15 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
 }
 
 /**
- * Load site settings from PostgreSQL (Prisma) or local JSON file.
+ * Load site settings from Supabase or local JSON file.
  */
 export async function loadSettingsAsync(): Promise<SiteSettings> {
+  const supabaseSettings = await fetchSettingsFromSupabase();
+  if (supabaseSettings) {
+    memorySettings = supabaseSettings;
+    return supabaseSettings;
+  }
+
   if (process.env.DATABASE_URL) {
     try {
       const dbSettings = await prisma.siteSetting.findUnique({
@@ -240,11 +257,6 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
         };
         return memorySettings;
       }
-
-      // If empty, seed default settings into Supabase
-      await saveSettingsPersistent(DEFAULT_SETTINGS);
-      memorySettings = { ...DEFAULT_SETTINGS };
-      return memorySettings;
     } catch (e) {
       console.warn("Prisma DB settings read error:", e);
     }
@@ -312,7 +324,7 @@ export function loadSettingsSync(): SiteSettings {
 }
 
 /**
- * Save site settings to PostgreSQL (Prisma) and local JSON file.
+ * Save site settings to Supabase (REST API + Prisma) and local JSON file.
  */
 export async function saveSettingsPersistent(settings: SiteSettings): Promise<SiteSettings> {
   memorySettings = { ...settings };
@@ -323,6 +335,8 @@ export async function saveSettingsPersistent(settings: SiteSettings): Promise<Si
   } catch (e) {
     console.warn("Filesystem write skipped (Serverless environment)", e);
   }
+
+  await saveSettingsToSupabase(settings);
 
   if (process.env.DATABASE_URL) {
     try {
