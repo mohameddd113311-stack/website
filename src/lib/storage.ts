@@ -47,7 +47,7 @@ function parseFeatures(features: any): string[] {
 
 /**
  * Load products from PostgreSQL (Prisma) when DATABASE_URL is available,
- * otherwise load from local JSON file.
+ * otherwise load from local JSON file. Automatically seeds initial products if DB is empty.
  */
 export async function loadProductsAsync(): Promise<Product[]> {
   // 1. Primary: Prisma PostgreSQL (Supabase / PostgreSQL)
@@ -78,6 +78,14 @@ export async function loadProductsAsync(): Promise<Product[]> {
         }));
         memoryProducts = mapped;
         return mapped;
+      }
+      
+      // If Supabase table exists but has 0 products, seed initial products into Supabase
+      if (dbProducts && dbProducts.length === 0) {
+        console.log("Database table 'products' is empty. Seeding initial products to Supabase...");
+        await saveProductsPersistent(INITIAL_PRODUCTS);
+        memoryProducts = [...INITIAL_PRODUCTS];
+        return memoryProducts;
       }
     } catch (e) {
       console.warn("Prisma PostgreSQL products read error, falling back to local file:", e);
@@ -232,6 +240,11 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
         };
         return memorySettings;
       }
+
+      // If empty, seed default settings into Supabase
+      await saveSettingsPersistent(DEFAULT_SETTINGS);
+      memorySettings = { ...DEFAULT_SETTINGS };
+      return memorySettings;
     } catch (e) {
       console.warn("Prisma DB settings read error:", e);
     }
