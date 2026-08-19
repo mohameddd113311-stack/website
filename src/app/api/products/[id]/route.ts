@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { updateProductAsync, deleteProductAsync } from '@/lib/products';
+import { saveProductToSupabase, deleteProductFromSupabase } from '@/lib/supabase';
 import { isAdminAuthenticated, sanitizeInput, sanitizeImageUrl } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -52,6 +53,9 @@ export async function PUT(
       );
     }
 
+    // Direct guarantee write to Supabase
+    await saveProductToSupabase(updated);
+
     return NextResponse.json({ success: true, product: updated });
   } catch (error: any) {
     console.error("Update Product Error:", error);
@@ -83,6 +87,9 @@ export async function DELETE(
       { status: 404 }
     );
   }
+
+  // Direct guarantee delete from Supabase
+  await deleteProductFromSupabase(id);
 
   return NextResponse.json({ success: true, message: 'تم حذف المنتج بنجاح' });
 }

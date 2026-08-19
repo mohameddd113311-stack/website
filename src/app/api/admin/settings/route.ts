@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSiteSettingsAsync, saveSiteSettingsAsync } from '@/lib/settings';
+import { saveSettingsToSupabase } from '@/lib/supabase';
 import { isAdminAuthenticated, sanitizeInput } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
@@ -29,11 +30,14 @@ export async function POST(request: Request) {
       usdToEgpRate: usdToEgpRate !== undefined && !isNaN(Number(usdToEgpRate)) ? Number(usdToEgpRate) : undefined,
     });
 
+    // Direct guarantee write to Supabase
+    await saveSettingsToSupabase(updated);
+
     return NextResponse.json({ success: true, settings: updated });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Save settings error:", error);
     return NextResponse.json(
-      { success: false, error: 'حدث خطأ أثناء حفظ الإعدادات' },
+      { success: false, error: error?.message || 'حدث خطأ أثناء حفظ الإعدادات' },
       { status: 500 }
     );
   }

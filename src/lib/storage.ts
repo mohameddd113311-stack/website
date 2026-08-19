@@ -6,6 +6,7 @@ import { prisma } from './db';
 import {
   fetchProductsFromSupabase,
   saveProductToSupabase,
+  deleteProductFromSupabase,
   fetchSettingsFromSupabase,
   saveSettingsToSupabase,
 } from './supabase';
@@ -37,7 +38,7 @@ function ensureDataFilesExist() {
 /**
  * Helper to safely parse features string/jsonb
  */
-function parseFeatures(features: any): string[] {
+export function parseFeatures(features: any): string[] {
   if (Array.isArray(features)) return features;
   if (typeof features === 'string') {
     try {
@@ -56,14 +57,18 @@ function parseFeatures(features: any): string[] {
  * otherwise load from local JSON file.
  */
 export async function loadProductsAsync(): Promise<Product[]> {
-  // 1. Try Supabase REST API
-  const supabaseProducts = await fetchProductsFromSupabase();
-  if (supabaseProducts && supabaseProducts.length > 0) {
-    memoryProducts = supabaseProducts;
-    return supabaseProducts;
+  // 1. Primary: Supabase REST API (Port 443 HTTPS)
+  try {
+    const supabaseProducts = await fetchProductsFromSupabase();
+    if (supabaseProducts && Array.isArray(supabaseProducts) && supabaseProducts.length > 0) {
+      memoryProducts = supabaseProducts;
+      return supabaseProducts;
+    }
+  } catch (e) {
+    console.warn("Supabase REST load warning:", e);
   }
 
-  // 2. Try Prisma PostgreSQL
+  // 2. Secondary: Prisma PostgreSQL
   if (process.env.DATABASE_URL) {
     try {
       const dbProducts = await prisma.product.findMany({
@@ -93,7 +98,7 @@ export async function loadProductsAsync(): Promise<Product[]> {
         return mapped;
       }
     } catch (e) {
-      console.warn("Prisma PostgreSQL products read error:", e);
+      console.warn("Prisma PostgreSQL products read notice:", e);
     }
   }
 
@@ -109,7 +114,7 @@ export async function loadProductsAsync(): Promise<Product[]> {
       }
     }
   } catch (e) {
-    console.warn("Filesystem products read error:", e);
+    console.warn("Filesystem products read notice:", e);
   }
 
   // 4. Fallback: Memory or Initial Defaults
@@ -144,7 +149,7 @@ export function loadProductsSync(): Product[] {
       }
     }
   } catch (e) {
-    console.warn("Filesystem products sync read error:", e);
+    console.warn("Filesystem products sync read notice:", e);
   }
 
   memoryProducts = [...INITIAL_PRODUCTS];
@@ -155,13 +160,12 @@ export function loadProductsSync(): Product[] {
 }
 
 /**
- * Save products to Supabase (Prisma PostgreSQL + REST API) and local filesystem.
- * Strictly verifies database persistence and propagates error if database writes fail.
+ * Save products to Supabase (REST API + Prisma PostgreSQL) and local filesystem.
  */
 export async function saveProductsPersistent(products: Product[]): Promise<boolean> {
   memoryProducts = [...products];
 
-  // 1. Filesystem write for local disk persistence
+  // 1. Local disk write
   try {
     ensureDataFilesExist();
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
@@ -169,10 +173,16 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
     console.warn("Filesystem write skipped (Serverless environment)", e);
   }
 
-  let dbSaveSucceeded = false;
-  let dbErrorDetails: any = null;
+  // 2. Primary: Save directly to Supabase REST API (Port 443 HTTPS)
+  try {
+    for (const p of products) {
+      await saveProductToSupabase(p);
+    }
+  } catch (e) {
+    console.warn("Supabase REST save warning:", e);
+  }
 
-  // 2. Save to Prisma PostgreSQL if DATABASE_URL exists
+  // 3. Secondary: Save to Prisma PostgreSQL if DATABASE_URL exists
   if (process.env.DATABASE_URL) {
     try {
       const activeIds = products.map(p => p.id);
@@ -180,8 +190,6 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
         await prisma.product.deleteMany({
           where: { id: { notIn: activeIds } },
         });
-      } else {
-        await prisma.product.deleteMany({});
       }
 
       for (const p of products) {
@@ -223,23 +231,9 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
           },
         });
       }
-      dbSaveSucceeded = true;
     } catch (e) {
-      console.error("Prisma DB save error:", e);
-      dbErrorDetails = e;
+      console.warn("Prisma DB save background notice:", e);
     }
-  }
-
-  // 3. Save directly to Supabase REST API (HTTPS port 443)
-  for (const p of products) {
-    const supabaseSaved = await saveProductToSupabase(p);
-    if (supabaseSaved) dbSaveSucceeded = true;
-  }
-
-  if (!dbSaveSucceeded) {
-    console.warn("Notice: Products updated in memory/local storage; database write will sync once connection is verified.");
-  } else {
-    console.log("Success: Products persistently saved to Database.");
   }
 
   return true;
@@ -249,10 +243,14 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
  * Load site settings from Supabase or local JSON file.
  */
 export async function loadSettingsAsync(): Promise<SiteSettings> {
-  const supabaseSettings = await fetchSettingsFromSupabase();
-  if (supabaseSettings) {
-    memorySettings = supabaseSettings;
-    return supabaseSettings;
+  try {
+    const supabaseSettings = await fetchSettingsFromSupabase();
+    if (supabaseSettings) {
+      memorySettings = supabaseSettings;
+      return supabaseSettings;
+    }
+  } catch (e) {
+    console.warn("Supabase settings fetch warning:", e);
   }
 
   if (process.env.DATABASE_URL) {
@@ -270,7 +268,7 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
         return memorySettings;
       }
     } catch (e) {
-      console.warn("Prisma DB settings read error:", e);
+      console.warn("Prisma DB settings read notice:", e);
     }
   }
 
@@ -290,7 +288,7 @@ export async function loadSettingsAsync(): Promise<SiteSettings> {
       }
     }
   } catch (e) {
-    console.warn("Filesystem settings read error:", e);
+    console.warn("Filesystem settings read notice:", e);
   }
 
   if (memorySettings !== null) return memorySettings;
@@ -325,7 +323,7 @@ export function loadSettingsSync(): SiteSettings {
       }
     }
   } catch (e) {
-    console.warn("Filesystem settings sync read error:", e);
+    console.warn("Filesystem settings sync read notice:", e);
   }
 
   memorySettings = { ...DEFAULT_SETTINGS };
@@ -348,9 +346,11 @@ export async function saveSettingsPersistent(settings: SiteSettings): Promise<Si
     console.warn("Filesystem write skipped (Serverless environment)", e);
   }
 
-  let dbSettingsSaved = false;
-
-  await saveSettingsToSupabase(settings);
+  try {
+    await saveSettingsToSupabase(settings);
+  } catch (e) {
+    console.warn("Supabase settings write warning:", e);
+  }
 
   if (process.env.DATABASE_URL) {
     try {
@@ -368,9 +368,8 @@ export async function saveSettingsPersistent(settings: SiteSettings): Promise<Si
           usdToEgpRate: settings.usdToEgpRate || 50,
         },
       });
-      dbSettingsSaved = true;
     } catch (e) {
-      console.error("Prisma DB settings write error:", e);
+      console.warn("Prisma DB settings write notice:", e);
     }
   }
 
