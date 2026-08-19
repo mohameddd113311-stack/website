@@ -6,7 +6,6 @@ import { prisma } from './db';
 import {
   fetchProductsFromSupabase,
   saveProductToSupabase,
-  deleteProductFromSupabase,
   fetchSettingsFromSupabase,
   saveSettingsToSupabase,
 } from './supabase';
@@ -57,14 +56,14 @@ function parseFeatures(features: any): string[] {
  * otherwise load from local JSON file.
  */
 export async function loadProductsAsync(): Promise<Product[]> {
-  // 1. Primary: Supabase REST API
+  // 1. Try Supabase REST API
   const supabaseProducts = await fetchProductsFromSupabase();
   if (supabaseProducts && supabaseProducts.length > 0) {
     memoryProducts = supabaseProducts;
     return supabaseProducts;
   }
 
-  // 2. Secondary: Prisma PostgreSQL
+  // 2. Try Prisma PostgreSQL
   if (process.env.DATABASE_URL) {
     try {
       const dbProducts = await prisma.product.findMany({
@@ -94,7 +93,7 @@ export async function loadProductsAsync(): Promise<Product[]> {
         return mapped;
       }
     } catch (e) {
-      console.warn("Prisma PostgreSQL products read error, falling back to local file:", e);
+      console.warn("Prisma PostgreSQL products read error:", e);
     }
   }
 
@@ -156,7 +155,8 @@ export function loadProductsSync(): Product[] {
 }
 
 /**
- * Save products to Supabase (REST API + Prisma PostgreSQL) and local filesystem.
+ * Save products to Supabase (Prisma PostgreSQL + REST API) and local filesystem.
+ * Strictly verifies database persistence and propagates error if database writes fail.
  */
 export async function saveProductsPersistent(products: Product[]): Promise<boolean> {
   memoryProducts = [...products];
@@ -169,12 +169,10 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
     console.warn("Filesystem write skipped (Serverless environment)", e);
   }
 
-  // 2. Save directly to Supabase REST API (HTTPS port 443)
-  for (const p of products) {
-    await saveProductToSupabase(p);
-  }
+  let dbSaveSucceeded = false;
+  let dbErrorDetails: any = null;
 
-  // 3. Save to Prisma PostgreSQL if DATABASE_URL exists
+  // 2. Save to Prisma PostgreSQL if DATABASE_URL exists
   if (process.env.DATABASE_URL) {
     try {
       const activeIds = products.map(p => p.id);
@@ -225,9 +223,23 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
           },
         });
       }
+      dbSaveSucceeded = true;
     } catch (e) {
-      console.warn("Prisma DB save error:", e);
+      console.error("Prisma DB save error:", e);
+      dbErrorDetails = e;
     }
+  }
+
+  // 3. Save directly to Supabase REST API (HTTPS port 443)
+  for (const p of products) {
+    const supabaseSaved = await saveProductToSupabase(p);
+    if (supabaseSaved) dbSaveSucceeded = true;
+  }
+
+  // If a database is configured (DATABASE_URL or Supabase Key) but both writes failed, throw error
+  if ((process.env.DATABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) && !dbSaveSucceeded) {
+    console.error("Critical: Database persistence failed!", dbErrorDetails);
+    throw new Error(`فشل الحفظ في قاعدة البيانات. يرجى التأكد من صحة رابط DATABASE_URL أو مفاتيح Supabase.`);
   }
 
   return true;
@@ -336,6 +348,8 @@ export async function saveSettingsPersistent(settings: SiteSettings): Promise<Si
     console.warn("Filesystem write skipped (Serverless environment)", e);
   }
 
+  let dbSettingsSaved = false;
+
   await saveSettingsToSupabase(settings);
 
   if (process.env.DATABASE_URL) {
@@ -354,8 +368,9 @@ export async function saveSettingsPersistent(settings: SiteSettings): Promise<Si
           usdToEgpRate: settings.usdToEgpRate || 50,
         },
       });
+      dbSettingsSaved = true;
     } catch (e) {
-      console.warn("Prisma DB settings write error:", e);
+      console.error("Prisma DB settings write error:", e);
     }
   }
 
