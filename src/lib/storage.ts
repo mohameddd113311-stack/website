@@ -29,6 +29,23 @@ function ensureDataFilesExist() {
 }
 
 /**
+ * Helper to safely parse features string/jsonb
+ */
+function parseFeatures(features: any): string[] {
+  if (Array.isArray(features)) return features;
+  if (typeof features === 'string') {
+    try {
+      const parsed = JSON.parse(features);
+      if (Array.isArray(parsed)) return parsed;
+      return [features];
+    } catch {
+      return [features];
+    }
+  }
+  return [];
+}
+
+/**
  * Load products from PostgreSQL (Prisma) when DATABASE_URL is available,
  * otherwise load from local JSON file.
  */
@@ -49,7 +66,7 @@ export async function loadProductsAsync(): Promise<Product[]> {
           stockQuantity: p.stockQuantity ?? 999,
           billingPeriod: p.billingPeriod,
           description: p.description,
-          features: typeof p.features === 'string' ? JSON.parse(p.features) : p.features,
+          features: parseFeatures(p.features),
           badge: p.badge || undefined,
           popular: p.popular,
           imageUrl: p.imageUrl || undefined,
@@ -151,6 +168,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
       }
 
       for (const p of products) {
+        const featuresStr = typeof p.features === 'string' ? p.features : JSON.stringify(p.features || []);
         await prisma.product.upsert({
           where: { id: p.id },
           update: {
@@ -161,7 +179,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
             stockQuantity: p.stockQuantity ?? 999,
             billingPeriod: p.billingPeriod,
             description: p.description,
-            features: JSON.stringify(p.features || []),
+            features: featuresStr,
             badge: p.badge || null,
             popular: p.popular || false,
             imageUrl: p.imageUrl || null,
@@ -178,7 +196,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
             stockQuantity: p.stockQuantity ?? 999,
             billingPeriod: p.billingPeriod,
             description: p.description,
-            features: JSON.stringify(p.features || []),
+            features: featuresStr,
             badge: p.badge || null,
             popular: p.popular || false,
             imageUrl: p.imageUrl || null,
@@ -189,7 +207,8 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
         });
       }
     } catch (e) {
-      console.warn("Prisma DB save error:", e);
+      console.error("Prisma DB save error:", e);
+      throw e;
     }
   }
 
@@ -310,7 +329,8 @@ export async function saveSettingsPersistent(settings: SiteSettings): Promise<Si
         },
       });
     } catch (e) {
-      console.warn("Prisma DB settings write error:", e);
+      console.error("Prisma DB settings write error:", e);
+      throw e;
     }
   }
 

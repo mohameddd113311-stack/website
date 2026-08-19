@@ -12,25 +12,29 @@ model Product {
   name          String
   category      String   @default("ذكاء اصطناعي")
   price         String
-  originalPrice String?
-  stockQuantity Int      @default(999)
-  billingPeriod String   @default("شهرياً")
+  originalPrice String?  @map("original_price")
+  stockQuantity Int      @default(999) @map("stock_quantity")
+  billingPeriod String   @default("شهرياً") @map("billing_period")
   description   String
   features      String   // JSON stringified string[]
   badge         String?
   popular       Boolean  @default(false)
-  imageUrl      String?
-  iconType      String   @default("gemini")
-  whatsappMsg   String?
+  imageUrl      String?  @map("image_url")
+  iconType      String   @default("gemini") @map("icon_type")
+  whatsappMsg   String?  @map("whatsapp_msg")
   active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("products")
 }
 
 model SiteSetting {
   id             String   @id @default("default")
-  whatsappNumber String   @default("201021510826")
-  facebookUrl    String   @default("https://www.facebook.com/share/1NbRrA56uz/")
-  usdToEgpRate   Float    @default(50.0)
-  updatedAt      DateTime @updatedAt
+  whatsappNumber String   @default("201021510826") @map("whatsapp_number")
+  facebookUrl    String   @default("https://www.facebook.com/share/1NbRrA56uz/") @map("facebook_url")
+  usdToEgpRate   Float    @default(50.0) @map("usd_to_egp_rate")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
 }
