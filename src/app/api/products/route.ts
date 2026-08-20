@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getProductsAsync, addProductAsync } from '@/lib/products';
-import { saveProductToSupabase } from '@/lib/supabase';
+import { addProductAsync } from '@/lib/products';
 import { isAdminAuthenticated, sanitizeInput, sanitizeImageUrl } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET() {
+  const { getProductsAsync } = await import('@/lib/products');
   const products = await getProductsAsync();
   return NextResponse.json({ success: true, products });
 }
@@ -52,9 +52,6 @@ export async function POST(request: Request) {
       whatsappMsg: whatsappMsg ? sanitizeInput(whatsappMsg) : undefined,
       active: true
     });
-
-    // Direct guarantee write to Supabase
-    await saveProductToSupabase(newProduct);
 
     return NextResponse.json({ success: true, product: newProduct });
   } catch (error: any) {

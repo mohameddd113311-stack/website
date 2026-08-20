@@ -161,28 +161,31 @@ export function loadProductsSync(): Product[] {
 
 /**
  * Save products to Supabase (REST API + Prisma PostgreSQL) and local filesystem.
+ * Returns true only if at least one persistent backend (Supabase or Prisma) succeeded.
  */
 export async function saveProductsPersistent(products: Product[]): Promise<boolean> {
   memoryProducts = [...products];
+  let persistentSaveSucceeded = false;
+  const errors: string[] = [];
 
-  // 1. Local disk write
+  // 1. Primary: Save to Supabase REST API (persistent, works on Vercel)
   try {
-    ensureDataFilesExist();
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
-  } catch (e) {
-    console.warn("Filesystem write skipped (Serverless environment)", e);
-  }
-
-  // 2. Primary: Save directly to Supabase REST API (Port 443 HTTPS)
-  try {
-    for (const p of products) {
-      await saveProductToSupabase(p);
+    const supabaseResults = await Promise.allSettled(
+      products.map(p => saveProductToSupabase(p))
+    );
+    const supabaseFailures = supabaseResults.filter(
+      r => r.status === 'rejected' || (r.status === 'fulfilled' && r.value === false)
+    );
+    if (supabaseFailures.length === 0 && products.length > 0) {
+      persistentSaveSucceeded = true;
+    } else if (supabaseFailures.length > 0) {
+      errors.push(`Supabase: ${supabaseFailures.length}/${products.length} products failed`);
     }
-  } catch (e) {
-    console.warn("Supabase REST save warning:", e);
+  } catch (e: any) {
+    errors.push(`Supabase REST save error: ${e?.message || e}`);
   }
 
-  // 3. Secondary: Save to Prisma PostgreSQL if DATABASE_URL exists
+  // 2. Secondary: Save to Prisma PostgreSQL (persistent, works on Vercel)
   if (process.env.DATABASE_URL) {
     try {
       const activeIds = products.map(p => p.id);
@@ -231,9 +234,29 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
           },
         });
       }
-    } catch (e) {
-      console.warn("Prisma DB save background notice:", e);
+      persistentSaveSucceeded = true;
+    } catch (e: any) {
+      errors.push(`Prisma DB save error: ${e?.message || e}`);
     }
+  }
+
+  // 3. Fallback: Local disk write (only useful in non-serverless environments)
+  try {
+    ensureDataFilesExist();
+    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
+  } catch (e) {
+    // Silently skip on serverless (Vercel) - filesystem is ephemeral
+  }
+
+  if (errors.length > 0) {
+    console.error("Save products errors:", errors.join('; '));
+  }
+
+  if (!persistentSaveSucceeded) {
+    throw new Error(
+      `Failed to save products to any persistent database. ` +
+      `Changes are NOT saved. Errors: ${errors.join('; ') || 'Unknown error - check Supabase anon key and DATABASE_URL'}`
+    );
   }
 
   return true;
@@ -335,23 +358,26 @@ export function loadSettingsSync(): SiteSettings {
 
 /**
  * Save site settings to Supabase (REST API + Prisma) and local JSON file.
+ * Throws error if no persistent backend succeeds.
  */
 export async function saveSettingsPersistent(settings: SiteSettings): Promise<SiteSettings> {
   memorySettings = { ...settings };
+  let persistentSaveSucceeded = false;
+  const errors: string[] = [];
 
+  // 1. Primary: Supabase REST API
   try {
-    ensureDataFilesExist();
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
-  } catch (e) {
-    console.warn("Filesystem write skipped (Serverless environment)", e);
+    const result = await saveSettingsToSupabase(settings);
+    if (result) {
+      persistentSaveSucceeded = true;
+    } else {
+      errors.push("Supabase settings save returned false");
+    }
+  } catch (e: any) {
+    errors.push(`Supabase settings write error: ${e?.message || e}`);
   }
 
-  try {
-    await saveSettingsToSupabase(settings);
-  } catch (e) {
-    console.warn("Supabase settings write warning:", e);
-  }
-
+  // 2. Secondary: Prisma PostgreSQL
   if (process.env.DATABASE_URL) {
     try {
       await prisma.siteSetting.upsert({
@@ -368,9 +394,29 @@ export async function saveSettingsPersistent(settings: SiteSettings): Promise<Si
           usdToEgpRate: settings.usdToEgpRate || 50,
         },
       });
-    } catch (e) {
-      console.warn("Prisma DB settings write notice:", e);
+      persistentSaveSucceeded = true;
+    } catch (e: any) {
+      errors.push(`Prisma DB settings write error: ${e?.message || e}`);
     }
+  }
+
+  // 3. Fallback: Local disk (ephemeral on Vercel)
+  try {
+    ensureDataFilesExist();
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (e) {
+    // Silently skip on serverless
+  }
+
+  if (errors.length > 0) {
+    console.error("Save settings errors:", errors.join('; '));
+  }
+
+  if (!persistentSaveSucceeded) {
+    throw new Error(
+      `Failed to save settings to any persistent database. ` +
+      `Errors: ${errors.join('; ') || 'Unknown error - check Supabase key and DATABASE_URL'}`
+    );
   }
 
   return memorySettings;

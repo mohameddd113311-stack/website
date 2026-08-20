@@ -11,7 +11,16 @@ const supabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   process.env.SUPABASE_ANON_KEY ||
-  'sb_publishable_dRMbXNN3PaDsQYZXRh4axw_YwyfO5wF';
+  '';
+
+if (!supabaseKey) {
+  console.error("CRITICAL: No Supabase key found! Set SUPABASE_SERVICE_ROLE_KEY in your environment variables.");
+} else if (!supabaseKey.startsWith('eyJ') && !supabaseKey.startsWith('sb_')) {
+  console.error(
+    `CRITICAL: Supabase key looks invalid (starts with "${supabaseKey.substring(0, 10)}..."). ` +
+    `It should start with "eyJ" or "sb_". Get the correct key from Supabase Dashboard → Settings → API.`
+  );
+}
 
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey);
 
@@ -23,7 +32,7 @@ export async function fetchProductsFromSupabase(): Promise<Product[] | null> {
       .order('created_at', { ascending: false });
 
     if (error || !data) {
-      console.warn("Supabase products fetch warning:", error);
+      console.error("Supabase products fetch error:", error?.message || error, "code:", error?.code);
       return null;
     }
 
@@ -75,7 +84,7 @@ export async function saveProductToSupabase(product: Product): Promise<boolean> 
 
     const { error } = await supabase.from('products').upsert(payload, { onConflict: 'id' });
     if (error) {
-      console.warn("Supabase product upsert error:", error);
+      console.error("Supabase product upsert error:", error?.message, "code:", error?.code, "detail:", error?.details);
       return false;
     }
     return true;
@@ -89,7 +98,7 @@ export async function deleteProductFromSupabase(id: string): Promise<boolean> {
   try {
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) {
-      console.warn("Supabase product delete error:", error);
+      console.error("Supabase product delete error:", error?.message, "code:", error?.code);
       return false;
     }
     return true;
@@ -131,7 +140,10 @@ export async function saveSettingsToSupabase(settings: SiteSettings): Promise<bo
     };
 
     const { error } = await supabase.from('site_settings').upsert(payload, { onConflict: 'id' });
-    if (error) return false;
+    if (error) {
+      console.error("Supabase settings upsert error:", error?.message, "code:", error?.code, "detail:", error?.details);
+      return false;
+    }
     return true;
   } catch (e) {
     return false;
