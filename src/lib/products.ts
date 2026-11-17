@@ -94,14 +94,21 @@ export const INITIAL_PRODUCTS: Product[] = [
   }
 ];
 
-import { loadProductsSync, loadProductsAsync, saveProductsPersistent } from './storage';
+import {
+  loadProductsSync,
+  loadProductsAsync,
+  saveProductsPersistent,
+  invalidateProductsCache,
+} from './storage';
+
+export { invalidateProductsCache };
 
 export function getProducts(): Product[] {
   return loadProductsSync();
 }
 
-export async function getProductsAsync(): Promise<Product[]> {
-  return await loadProductsAsync();
+export async function getProductsAsync(forceRefresh: boolean = false): Promise<Product[]> {
+  return await loadProductsAsync(forceRefresh);
 }
 
 export function saveProducts(products: Product[]): boolean {

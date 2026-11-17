@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getProductsAsync, saveProductsAsync, Product } from '@/lib/products';
+import { getProductsAsync, saveProductsAsync, invalidateProductsCache, Product } from '@/lib/products';
 import { isAdminAuthenticated } from '@/lib/auth';
+import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 export async function POST(request: Request) {
   const isAuth = await isAdminAuthenticated();
@@ -26,6 +26,12 @@ export async function POST(request: Request) {
     }
 
     await saveProductsAsync(products as Product[]);
+    invalidateProductsCache();
+    try {
+      revalidatePath('/');
+      revalidatePath('/admin');
+    } catch {}
+
     const currentProducts = await getProductsAsync();
 
     return NextResponse.json({

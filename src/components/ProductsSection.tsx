@@ -17,7 +17,7 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
 
   const syncProductsFromSources = async () => {
     try {
-      const res = await fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch('/api/products');
       const data = await res.json();
 
       if (data.success && Array.isArray(data.products) && data.products.length > 0) {
@@ -37,7 +37,10 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
   }, [initialProducts]);
 
   useEffect(() => {
-    syncProductsFromSources();
+    // Only fetch on mount if SSR did not provide initialProducts
+    if (!initialProducts || initialProducts.length === 0) {
+      syncProductsFromSources();
+    }
 
     const handleUpdate = () => {
       syncProductsFromSources();
@@ -52,7 +55,7 @@ export default function ProductsSection({ initialProducts }: ProductsSectionProp
       window.removeEventListener('products_updated', handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
-  }, []);
+  }, [initialProducts]);
 
   return (
     <section id="products" className="py-20 relative overflow-hidden grid-bg">

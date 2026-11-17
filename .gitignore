@@ -18,8 +18,26 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
+# environment variables & secrets (CRITICAL: Never commit to Git)
+.env
 .env*.local
+.env.development
+.env.test
+.env.production
+.env.backup
+
+# scratch & test scripts containing credentials
+scratch_*.js
+test_*.js
+*.lock
+
+# backups & archives
+*.zip
+*.tar.gz
+*.bak
+ai_studio_backup_*.json
+original_project_backup.zip
+website-optimized-*.zip
 
 # vercel
 .vercel

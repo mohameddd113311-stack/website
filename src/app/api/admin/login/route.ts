@@ -1,7 +1,30 @@
 import { NextResponse } from 'next/server';
 import { verifyAdminCredentials, createAdminToken } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export async function POST(request: Request) {
+  // Stricter rate limit for login to prevent brute force (5 attempts per minute per IP)
+  const clientIp = getClientIp(request);
+  const rateCheck = checkRateLimit(`admin_login:${clientIp}`, 5, 60 * 1000);
+
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: `تم تجاوز الحد الأقصى لمحاولات تسجيل الدخول. يرجى الانتظار ${rateCheck.retryAfterSeconds} ثانية والمحاولة مجدداً.`,
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rateCheck.retryAfterSeconds),
+          'X-RateLimit-Limit': String(rateCheck.limit),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(rateCheck.reset),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { username, password } = body;

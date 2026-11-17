@@ -15,9 +15,37 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const PRODUCTS_FILE = path.join(DATA_DIR, 'products.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
-// In-memory cache for fast sync reads
+// In-memory cache for fast sync reads and TTL caching
 let memoryProducts: Product[] | null = null;
 let memorySettings: SiteSettings | null = null;
+let lastProductsFetchTime = 0;
+let lastSettingsFetchTime = 0;
+
+// Cache TTL configuration
+export const PRODUCTS_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+export const SETTINGS_CACHE_TTL_MS = 300 * 1000; // 5 minutes
+
+// In-flight request coalescing to prevent thundering herd / duplicate concurrent queries
+let activeProductsPromise: Promise<Product[]> | null = null;
+let activeSettingsPromise: Promise<SiteSettings> | null = null;
+
+export function invalidateProductsCache() {
+  lastProductsFetchTime = 0;
+}
+
+export function invalidateSettingsCache() {
+  lastSettingsFetchTime = 0;
+}
+
+export function updateProductsMemoryCache(products: Product[]) {
+  memoryProducts = [...products];
+  lastProductsFetchTime = Date.now();
+}
+
+export function updateSettingsMemoryCache(settings: SiteSettings) {
+  memorySettings = { ...settings };
+  lastSettingsFetchTime = Date.now();
+}
 
 function ensureDataFilesExist() {
   try {
@@ -54,79 +82,102 @@ export function parseFeatures(features: any): string[] {
 
 /**
  * Load products from Supabase (REST API or Prisma),
- * otherwise load from local JSON file.
+ * with in-memory TTL caching and request coalescing to prevent concurrent duplicate queries.
  */
-export async function loadProductsAsync(): Promise<Product[]> {
-  // 1. Primary: Supabase REST API (Port 443 HTTPS)
-  try {
-    const supabaseProducts = await fetchProductsFromSupabase();
-    if (supabaseProducts && Array.isArray(supabaseProducts) && supabaseProducts.length > 0) {
-      memoryProducts = supabaseProducts;
-      return supabaseProducts;
-    }
-  } catch (e) {
-    console.warn("Supabase REST load warning:", e);
-  }
-
-  // 2. Secondary: Prisma PostgreSQL
-  if (process.env.DATABASE_URL) {
-    try {
-      const dbProducts = await prisma.product.findMany({
-        orderBy: { createdAt: 'desc' },
-      });
-      if (dbProducts && dbProducts.length > 0) {
-        const mapped: Product[] = dbProducts.map((p) => ({
-          id: p.id,
-          name: p.name,
-          category: p.category,
-          price: p.price,
-          originalPrice: p.originalPrice || undefined,
-          stockQuantity: p.stockQuantity ?? 999,
-          billingPeriod: p.billingPeriod,
-          description: p.description,
-          features: parseFeatures(p.features),
-          badge: p.badge || undefined,
-          popular: p.popular,
-          imageUrl: p.imageUrl || undefined,
-          iconType: (p.iconType as Product['iconType']) || 'custom',
-          whatsappMsg: p.whatsappMsg || undefined,
-          active: p.active,
-          createdAt: p.createdAt.toISOString(),
-          updatedAt: p.updatedAt.toISOString(),
-        }));
-        memoryProducts = mapped;
-        return mapped;
-      }
-    } catch (e) {
-      console.warn("Prisma PostgreSQL products read notice:", e);
-    }
-  }
-
-  // 3. Fallback: Local Filesystem JSON
-  ensureDataFilesExist();
-  try {
-    if (fs.existsSync(PRODUCTS_FILE)) {
-      const fileData = fs.readFileSync(PRODUCTS_FILE, 'utf-8');
-      const parsed = JSON.parse(fileData);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        memoryProducts = parsed;
-        return memoryProducts;
-      }
-    }
-  } catch (e) {
-    console.warn("Filesystem products read notice:", e);
-  }
-
-  // 4. Fallback: Memory or Initial Defaults
-  if (memoryProducts !== null && Array.isArray(memoryProducts) && memoryProducts.length > 0) {
+export async function loadProductsAsync(forceRefresh: boolean = false): Promise<Product[]> {
+  const now = Date.now();
+  // Return memory cache if still fresh and not forcing refresh
+  if (!forceRefresh && memoryProducts !== null && (now - lastProductsFetchTime < PRODUCTS_CACHE_TTL_MS)) {
     return memoryProducts;
   }
 
-  memoryProducts = [...INITIAL_PRODUCTS];
-  try {
-    fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(INITIAL_PRODUCTS, null, 2), 'utf-8');
-  } catch {}
-  return memoryProducts;
+  // Deduplicate concurrent requests (coalescing)
+  if (activeProductsPromise) {
+    return activeProductsPromise;
+  }
+
+  activeProductsPromise = (async () => {
+    try {
+      // 1. Primary: Supabase REST API (Port 443 HTTPS)
+      try {
+        const supabaseProducts = await fetchProductsFromSupabase();
+        if (supabaseProducts && Array.isArray(supabaseProducts) && supabaseProducts.length > 0) {
+          memoryProducts = supabaseProducts;
+          lastProductsFetchTime = Date.now();
+          return supabaseProducts;
+        }
+      } catch (e) {
+        console.warn("Supabase REST load warning:", e);
+      }
+
+      // 2. Secondary: Prisma PostgreSQL
+      if (process.env.DATABASE_URL) {
+        try {
+          const dbProducts = await prisma.product.findMany({
+            orderBy: { createdAt: 'desc' },
+          });
+          if (dbProducts && dbProducts.length > 0) {
+            const mapped: Product[] = dbProducts.map((p) => ({
+              id: p.id,
+              name: p.name,
+              category: p.category,
+              price: p.price,
+              originalPrice: p.originalPrice || undefined,
+              stockQuantity: p.stockQuantity ?? 999,
+              billingPeriod: p.billingPeriod,
+              description: p.description,
+              features: parseFeatures(p.features),
+              badge: p.badge || undefined,
+              popular: p.popular,
+              imageUrl: p.imageUrl || undefined,
+              iconType: (p.iconType as Product['iconType']) || 'custom',
+              whatsappMsg: p.whatsappMsg || undefined,
+              active: p.active,
+              createdAt: p.createdAt.toISOString(),
+              updatedAt: p.updatedAt.toISOString(),
+            }));
+            memoryProducts = mapped;
+            lastProductsFetchTime = Date.now();
+            return mapped;
+          }
+        } catch (e) {
+          console.warn("Prisma PostgreSQL products read notice:", e);
+        }
+      }
+
+      // 3. Fallback: Local Filesystem JSON
+      ensureDataFilesExist();
+      try {
+        if (fs.existsSync(PRODUCTS_FILE)) {
+          const fileData = fs.readFileSync(PRODUCTS_FILE, 'utf-8');
+          const parsed = JSON.parse(fileData);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            memoryProducts = parsed;
+            lastProductsFetchTime = Date.now();
+            return memoryProducts;
+          }
+        }
+      } catch (e) {
+        console.warn("Filesystem products read notice:", e);
+      }
+
+      // 4. Fallback: Memory or Initial Defaults
+      if (memoryProducts !== null && Array.isArray(memoryProducts) && memoryProducts.length > 0) {
+        return memoryProducts;
+      }
+
+      memoryProducts = [...INITIAL_PRODUCTS];
+      lastProductsFetchTime = Date.now();
+      try {
+        fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(INITIAL_PRODUCTS, null, 2), 'utf-8');
+      } catch {}
+      return memoryProducts;
+    } finally {
+      activeProductsPromise = null;
+    }
+  })();
+
+  return activeProductsPromise;
 }
 
 /**
@@ -165,6 +216,7 @@ export function loadProductsSync(): Product[] {
  */
 export async function saveProductsPersistent(products: Product[]): Promise<boolean> {
   memoryProducts = [...products];
+  lastProductsFetchTime = Date.now();
   let persistentSaveSucceeded = false;
   const errors: string[] = [];
 
@@ -263,64 +315,89 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
 }
 
 /**
- * Load site settings from Supabase or local JSON file.
+ * Load site settings from Supabase or local JSON file,
+ * with in-memory TTL caching and request coalescing.
  */
-export async function loadSettingsAsync(): Promise<SiteSettings> {
-  try {
-    const supabaseSettings = await fetchSettingsFromSupabase();
-    if (supabaseSettings) {
-      memorySettings = supabaseSettings;
-      return supabaseSettings;
-    }
-  } catch (e) {
-    console.warn("Supabase settings fetch warning:", e);
+export async function loadSettingsAsync(forceRefresh: boolean = false): Promise<SiteSettings> {
+  const now = Date.now();
+  if (!forceRefresh && memorySettings !== null && (now - lastSettingsFetchTime < SETTINGS_CACHE_TTL_MS)) {
+    return memorySettings;
   }
 
-  if (process.env.DATABASE_URL) {
+  if (activeSettingsPromise) {
+    return activeSettingsPromise;
+  }
+
+  activeSettingsPromise = (async () => {
     try {
-      const dbSettings = await prisma.siteSetting.findUnique({
-        where: { id: 'default' },
-      });
-      if (dbSettings) {
-        memorySettings = {
-          whatsappNumber: dbSettings.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
-          facebookUrl: dbSettings.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
-          usdToEgpRate: typeof dbSettings.usdToEgpRate === 'number' ? dbSettings.usdToEgpRate : 50,
-          updatedAt: dbSettings.updatedAt.toISOString(),
-        };
-        return memorySettings;
+      // 1. Supabase REST API
+      try {
+        const supabaseSettings = await fetchSettingsFromSupabase();
+        if (supabaseSettings) {
+          memorySettings = supabaseSettings;
+          lastSettingsFetchTime = Date.now();
+          return supabaseSettings;
+        }
+      } catch (e) {
+        console.warn("Supabase settings fetch warning:", e);
       }
-    } catch (e) {
-      console.warn("Prisma DB settings read notice:", e);
-    }
-  }
 
-  ensureDataFilesExist();
-  try {
-    if (fs.existsSync(SETTINGS_FILE)) {
-      const fileData = fs.readFileSync(SETTINGS_FILE, 'utf-8');
-      const parsed = JSON.parse(fileData);
-      if (parsed && typeof parsed === 'object') {
-        memorySettings = {
-          whatsappNumber: parsed.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
-          facebookUrl: parsed.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
-          usdToEgpRate: typeof parsed.usdToEgpRate === 'number' ? parsed.usdToEgpRate : 50,
-          updatedAt: parsed.updatedAt || DEFAULT_SETTINGS.updatedAt,
-        };
-        return memorySettings;
+      // 2. Prisma PostgreSQL
+      if (process.env.DATABASE_URL) {
+        try {
+          const dbSettings = await prisma.siteSetting.findUnique({
+            where: { id: 'default' },
+          });
+          if (dbSettings) {
+            memorySettings = {
+              whatsappNumber: dbSettings.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
+              facebookUrl: dbSettings.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
+              usdToEgpRate: typeof dbSettings.usdToEgpRate === 'number' ? dbSettings.usdToEgpRate : 50,
+              updatedAt: dbSettings.updatedAt.toISOString(),
+            };
+            lastSettingsFetchTime = Date.now();
+            return memorySettings;
+          }
+        } catch (e) {
+          console.warn("Prisma DB settings read notice:", e);
+        }
       }
+
+      // 3. Fallback: Local Filesystem JSON
+      ensureDataFilesExist();
+      try {
+        if (fs.existsSync(SETTINGS_FILE)) {
+          const fileData = fs.readFileSync(SETTINGS_FILE, 'utf-8');
+          const parsed = JSON.parse(fileData);
+          if (parsed && typeof parsed === 'object') {
+            memorySettings = {
+              whatsappNumber: parsed.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
+              facebookUrl: parsed.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
+              usdToEgpRate: typeof parsed.usdToEgpRate === 'number' ? parsed.usdToEgpRate : 50,
+              updatedAt: parsed.updatedAt || DEFAULT_SETTINGS.updatedAt,
+            };
+            lastSettingsFetchTime = Date.now();
+            return memorySettings;
+          }
+        }
+      } catch (e) {
+        console.warn("Filesystem settings read notice:", e);
+      }
+
+      if (memorySettings !== null) return memorySettings;
+
+      memorySettings = { ...DEFAULT_SETTINGS };
+      lastSettingsFetchTime = Date.now();
+      try {
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2), 'utf-8');
+      } catch {}
+      return memorySettings;
+    } finally {
+      activeSettingsPromise = null;
     }
-  } catch (e) {
-    console.warn("Filesystem settings read notice:", e);
-  }
+  })();
 
-  if (memorySettings !== null) return memorySettings;
-
-  memorySettings = { ...DEFAULT_SETTINGS };
-  try {
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2), 'utf-8');
-  } catch {}
-  return memorySettings;
+  return activeSettingsPromise;
 }
 
 /**
@@ -362,6 +439,7 @@ export function loadSettingsSync(): SiteSettings {
  */
 export async function saveSettingsPersistent(settings: SiteSettings): Promise<SiteSettings> {
   memorySettings = { ...settings };
+  lastSettingsFetchTime = Date.now();
   let persistentSaveSucceeded = false;
   const errors: string[] = [];
 

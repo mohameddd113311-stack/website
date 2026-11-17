@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getProductsAsync, saveProductsAsync, Product } from '@/lib/products';
-import { getSiteSettingsAsync, saveSiteSettingsAsync, SiteSettings } from '@/lib/settings';
+import { getProductsAsync, saveProductsAsync, invalidateProductsCache, Product } from '@/lib/products';
+import { getSiteSettingsAsync, saveSiteSettingsAsync, invalidateSettingsCache, SiteSettings } from '@/lib/settings';
 import { isAdminAuthenticated } from '@/lib/auth';
+import { revalidatePath } from 'next/cache';
 
 export async function GET() {
   const isAuth = await isAdminAuthenticated();
@@ -46,6 +47,13 @@ export async function POST(request: Request) {
     if (settings && typeof settings === 'object') {
       await saveSiteSettingsAsync(settings as SiteSettings);
     }
+
+    invalidateProductsCache();
+    invalidateSettingsCache();
+    try {
+      revalidatePath('/');
+      revalidatePath('/admin');
+    } catch {}
 
     const currentProducts = await getProductsAsync();
     const currentSettings = await getSiteSettingsAsync();

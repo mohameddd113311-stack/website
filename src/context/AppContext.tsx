@@ -60,23 +60,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
 
-    // Fetch latest settings from server
-    fetch(`/api/admin/settings?t=${Date.now()}`, { cache: 'no-store' })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.settings) {
-          const newSet: SiteSettings = {
-            whatsappNumber: data.settings.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
-            facebookUrl: data.settings.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
-            usdToEgpRate: data.settings.usdToEgpRate ? Number(data.settings.usdToEgpRate) : DEFAULT_SETTINGS.usdToEgpRate,
-          };
-          setSettingsState(newSet);
-          localStorage.setItem('ai_studio_settings', JSON.stringify(newSet));
-        }
-      })
-      .catch(() => {});
+    const savedSettingsTime = localStorage.getItem('ai_studio_settings_time');
+    const SETTINGS_LOCAL_CACHE_MS = 60 * 60 * 1000; // 1 hour client cache
+    const shouldFetchSettings =
+      !savedSettingsStr ||
+      !savedSettingsTime ||
+      Date.now() - Number(savedSettingsTime) > SETTINGS_LOCAL_CACHE_MS;
+
+    const fetchServerSettings = () => {
+      fetch('/api/admin/settings')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.settings) {
+            const newSet: SiteSettings = {
+              whatsappNumber: data.settings.whatsappNumber || DEFAULT_SETTINGS.whatsappNumber,
+              facebookUrl: data.settings.facebookUrl || DEFAULT_SETTINGS.facebookUrl,
+              usdToEgpRate: data.settings.usdToEgpRate ? Number(data.settings.usdToEgpRate) : DEFAULT_SETTINGS.usdToEgpRate,
+            };
+            setSettingsState(newSet);
+            localStorage.setItem('ai_studio_settings', JSON.stringify(newSet));
+            localStorage.setItem('ai_studio_settings_time', String(Date.now()));
+          }
+        })
+        .catch(() => {});
+    };
+
+    if (shouldFetchSettings) {
+      fetchServerSettings();
+    }
+
+    const handleSettingsUpdated = () => {
+      fetchServerSettings();
+    };
+    window.addEventListener('ai_studio_settings_updated', handleSettingsUpdated);
 
     setMounted(true);
+
+    return () => {
+      window.removeEventListener('ai_studio_settings_updated', handleSettingsUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -113,6 +135,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSettingsState(updated);
     if (typeof window !== 'undefined') {
       localStorage.setItem('ai_studio_settings', JSON.stringify(updated));
+      localStorage.setItem('ai_studio_settings_time', String(Date.now()));
     }
   };
 

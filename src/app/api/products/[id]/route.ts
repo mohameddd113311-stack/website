@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { updateProductAsync, deleteProductAsync } from '@/lib/products';
-import { deleteProductFromSupabase } from '@/lib/supabase';
+import { updateProductAsync, deleteProductAsync, invalidateProductsCache } from '@/lib/products';
 import { isAdminAuthenticated, sanitizeInput, sanitizeImageUrl } from '@/lib/auth';
+import { revalidatePath } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -53,6 +53,13 @@ export async function PUT(
       );
     }
 
+    // Invalidate caches and trigger Next.js page revalidations
+    invalidateProductsCache();
+    try {
+      revalidatePath('/');
+      revalidatePath('/admin');
+    } catch {}
+
     return NextResponse.json({ success: true, product: updated });
   } catch (error: any) {
     console.error("Update Product Error:", error);
@@ -86,6 +93,13 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    // Invalidate caches and trigger Next.js page revalidations
+    invalidateProductsCache();
+    try {
+      revalidatePath('/');
+      revalidatePath('/admin');
+    } catch {}
 
     return NextResponse.json({ success: true, message: 'تم حذف المنتج بنجاح' });
   } catch (error: any) {

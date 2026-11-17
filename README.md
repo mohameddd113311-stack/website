@@ -64,12 +64,12 @@ NEXT_PUBLIC_WHATSAPP_NUMBER=201000000000
 # رابط صفحة الفيسبوك الخاصة بالموقع
 NEXT_PUBLIC_FACEBOOK_URL=https://facebook.com/aistudio.official
 
-# بيانات دخول لوحة تحكم الأدمن
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=aistudio2026
+# بيانات دخول لوحة تحكم الأدمن (قم بتحديد بيانات قوية خاصة بك)
+ADMIN_USERNAME=your_admin_username
+ADMIN_PASSWORD=your_strong_admin_password
 
-# المفتاح السري لتشفير الجلسات (قم بتغييره في بيئة الإنتاج)
-JWT_SECRET=super-secret-key-aistudio-2026
+# المفتاح السري لتشفير الجلسات (قم بإنشاء مفتاح عشوائي قوي 32+ حرف)
+JWT_SECRET=your_random_32_character_jwt_secret
 ```
 
 ---
@@ -97,9 +97,8 @@ npm run dev
 ## 🔒 الوصول إلى لوحة تحكم الأدمن (`/admin`)
 
 - **رابط اللوحة**: `http://localhost:3000/admin`
-- **اسم المستخدم الافتراضي**: `admin`
-- **كلمة المرور الافتراضية**: `aistudio2026`
-*(يمكنك تعديل هذه البيانات في ملف `.env.local` في أي وقت)*
+- **بيانات الدخول**: يتم تحديدها عبر متغيرات البيئة `ADMIN_USERNAME` و `ADMIN_PASSWORD` في ملف `.env.local` أو لوحة Vercel.
+*(يرجى التأكد من اختيار كلمة مرور قوية ومفتاح JWT سري معقد)*
 
 ---
 

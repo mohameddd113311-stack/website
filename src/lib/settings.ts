@@ -1,9 +1,16 @@
-import { loadSettingsSync, loadSettingsAsync, saveSettingsPersistent } from './storage';
+import {
+  loadSettingsSync,
+  loadSettingsAsync,
+  saveSettingsPersistent,
+  invalidateSettingsCache,
+} from './storage';
+
+export { invalidateSettingsCache };
 
 export interface SiteSettings {
   whatsappNumber: string;
   facebookUrl: string;
-  usdToEgpRate: number; // 1 USD = X EGP (default: 5)
+  usdToEgpRate: number; // 1 USD = X EGP (default: 50)
   updatedAt?: string;
 }
 
@@ -18,8 +25,8 @@ export function getSiteSettings(): SiteSettings {
   return loadSettingsSync();
 }
 
-export async function getSiteSettingsAsync(): Promise<SiteSettings> {
-  return await loadSettingsAsync();
+export async function getSiteSettingsAsync(forceRefresh: boolean = false): Promise<SiteSettings> {
+  return await loadSettingsAsync(forceRefresh);
 }
 
 export function saveSiteSettings(settings: Partial<SiteSettings>): SiteSettings {

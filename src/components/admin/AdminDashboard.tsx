@@ -77,18 +77,20 @@ export default function AdminDashboard({ initialProducts }: AdminDashboardProps)
     }
   }, [initialProducts]);
 
-  // Fetch latest products from server API on mount with cache busting
+  // Fetch latest products from server API on mount ONLY if initialProducts is missing
   useEffect(() => {
-    fetch(`/api/products?t=${Date.now()}`, { cache: 'no-store' })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
-          setProducts(data.products);
-          setStoredProducts(data.products);
-        }
-      })
-      .catch(() => {});
-  }, []);
+    if (!initialProducts || initialProducts.length === 0) {
+      fetch('/api/products')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+            setProducts(data.products);
+            setStoredProducts(data.products);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [initialProducts]);
 
   const notifyProductsUpdated = () => {
     if (typeof window !== 'undefined') {

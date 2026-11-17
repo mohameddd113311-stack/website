@@ -33,9 +33,32 @@ CREATE TABLE IF NOT EXISTS site_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Disable Row Level Security (RLS) so API queries can read and write freely
-ALTER TABLE products DISABLE ROW LEVEL SECURITY;
-ALTER TABLE site_settings DISABLE ROW LEVEL SECURITY;
+-- 3. Row Level Security (RLS) Configuration
+-- Enable RLS to protect tables from unauthorized writes
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read-only access (for visitors and catalog browsing)
+CREATE POLICY "Public products are viewable by everyone" 
+ON products FOR SELECT 
+USING (active = true);
+
+CREATE POLICY "Public settings are viewable by everyone" 
+ON site_settings FOR SELECT 
+USING (true);
+
+-- Allow service_role (Next.js server-side operations) full read and write access
+CREATE POLICY "Service role full access on products"
+ON products FOR ALL
+TO service_role
+USING (true)
+WITH CHECK (true);
+
+CREATE POLICY "Service role full access on site_settings"
+ON site_settings FOR ALL
+TO service_role
+USING (true)
+WITH CHECK (true);
 
 -- 4. Insert Initial Default Site Settings
 INSERT INTO site_settings (id, whatsapp_number, facebook_url, usd_to_egp_rate)
