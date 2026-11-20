@@ -419,15 +419,31 @@ export function updateProduct(id: string, productData: Partial<Product>): Produc
 export async function updateProductAsync(id: string, productData: Partial<Product>): Promise<Product | null> {
   const products = await getProductsAsync();
   const existing = products.find(p => p.id === id);
-  if (!existing) return null;
 
   const now = new Date().toISOString();
+
+  // If not found in cache, still upsert with provided data (Supabase is source of truth)
+  const base: Product = existing || {
+    id,
+    name: '',
+    category: 'ذكاء اصطناعي',
+    price: '0',
+    billingPeriod: 'شهرياً',
+    description: '',
+    features: [],
+    iconType: 'custom',
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+
   const updatedProduct: Product = {
-    ...existing,
+    ...base,
     ...productData,
     id,
     updatedAt: now,
   };
+
   // Fast: upsert only the changed product, not all products
   const ok = await upsertSingleProduct(updatedProduct);
   if (!ok) throw new Error('Failed to update product in Supabase');

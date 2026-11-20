@@ -11,7 +11,7 @@ const supabaseKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   process.env.SUPABASE_ANON_KEY ||
-  '';
+  'sb_publishable_dRMbXNN3PaDsQYZXRh4axw_YwyfO5wF';
 
 if (!supabaseKey) {
   console.error("CRITICAL: No Supabase key found! Set SUPABASE_SERVICE_ROLE_KEY in your environment variables.");
