@@ -24,11 +24,26 @@ export default function Hero() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-10">
         
-        {/* Top Floating Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card border border-purple-500/30 text-purple-300 text-xs font-semibold mb-8 animate-float shadow-lg shadow-purple-900/20">
-          <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
-          <span>{t.hero.badge}</span>
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+        {/* Top Badges */}
+        <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card border border-purple-500/30 text-purple-300 text-xs font-semibold animate-float shadow-lg shadow-purple-900/20">
+            <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+            <span>{t.hero.badge}</span>
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+          </div>
+
+          <a
+            href="#reviews"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card border border-amber-500/40 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-bold transition-all shadow-md shadow-amber-900/20 hover:scale-105 active:scale-95 group"
+          >
+            <div className="flex items-center gap-0.5 text-amber-400">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className="w-3 h-3 fill-amber-400" />
+              ))}
+            </div>
+            <span>{lang === 'ar' ? 'آراء عملائنا (+1500 عميل)' : 'Client Reviews (1500+)'}</span>
+            <ArrowDown className="w-3.5 h-3.5 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
+          </a>
         </div>
 
         {/* Headline */}
@@ -50,6 +65,20 @@ export default function Hero() {
           >
             <span>{t.hero.exploreBtn}</span>
             <ArrowDown className="w-5 h-5 animate-bounce" />
+          </a>
+
+          {/* Prominent Direct Reviews Button */}
+          <a
+            href="#reviews"
+            className="w-full sm:w-auto glass-card border border-amber-500/40 hover:border-amber-400 hover:bg-amber-500/10 px-8 py-4 rounded-2xl font-bold text-base text-amber-300 hover:text-white flex items-center justify-center gap-3 transition-all duration-300 shadow-lg shadow-amber-900/20 hover:scale-[1.02]"
+          >
+            <div className="flex items-center gap-1 text-amber-400">
+              <Star className="w-5 h-5 fill-amber-400" />
+            </div>
+            <span>{lang === 'ar' ? 'آراء عملائنا' : 'Customer Reviews'}</span>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 font-extrabold">
+              4.9 ⭐
+            </span>
           </a>
 
           <a

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Sparkles, MessageCircle, Facebook, ShieldCheck, Menu, X, Globe, DollarSign } from 'lucide-react';
+import { Sparkles, MessageCircle, Facebook, ShieldCheck, Menu, X, Globe, DollarSign, Star } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function Header() {
@@ -51,7 +51,13 @@ export default function Header() {
           <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-300">
             <a href="#hero" className="hover:text-cyan-400 transition-colors">{t.nav.home}</a>
             <a href="#products" className="hover:text-cyan-400 transition-colors">{t.nav.products}</a>
-            <a href="#reviews" className="hover:text-cyan-400 transition-colors">{t.nav.reviews}</a>
+            <a
+              href="#reviews"
+              className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:text-white hover:bg-amber-500/20 hover:border-amber-400 flex items-center gap-1.5 font-bold transition-all shadow-sm shadow-amber-500/10"
+            >
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span>{lang === 'ar' ? 'آراء عملائنا' : 'Reviews'}</span>
+            </a>
             <a href="#why-us" className="hover:text-cyan-400 transition-colors">{t.nav.whyUs}</a>
             <a href="#faq" className="hover:text-cyan-400 transition-colors">{t.nav.faq}</a>
           </nav>
@@ -146,8 +152,16 @@ export default function Header() {
             </Link>
           </div>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Right Actions */}
           <div className="flex md:hidden items-center gap-2">
+            <a
+              href="#reviews"
+              className="px-2.5 py-1.5 rounded-xl glass-card text-xs font-bold text-amber-300 border border-amber-500/30 flex items-center gap-1 shadow-sm"
+            >
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span>{lang === 'ar' ? 'آراء عملائنا' : 'Reviews'}</span>
+            </a>
+
             <button
               onClick={() => {
                 const nextLang = lang === 'ar' ? 'en' : 'ar';
@@ -157,7 +171,7 @@ export default function Header() {
               className="px-2.5 py-1.5 rounded-xl glass-card text-xs font-bold text-purple-300 border border-slate-800 flex items-center gap-1"
             >
               <Globe className="w-3.5 h-3.5 text-cyan-400" />
-              <span>{lang === 'ar' ? 'EN ($)' : 'عربي (ج.م)'}</span>
+              <span>{lang === 'ar' ? 'EN' : 'عربي'}</span>
             </button>
 
             <button
@@ -190,9 +204,10 @@ export default function Header() {
             <a
               href="#reviews"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-slate-200 hover:text-cyan-400 font-medium py-1.5 border-b border-slate-800/50"
+              className="text-amber-300 hover:text-amber-200 font-bold py-1.5 border-b border-slate-800/50 flex items-center gap-2"
             >
-              {t.nav.reviews}
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              <span>{lang === 'ar' ? 'آراء عملائنا' : 'Customer Reviews'}</span>
             </a>
             <a
               href="#why-us"
