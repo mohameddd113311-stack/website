@@ -51,6 +51,7 @@ export default function Header() {
           <nav className="hidden lg:flex items-center gap-8 text-sm font-medium text-slate-300">
             <a href="#hero" className="hover:text-cyan-400 transition-colors">{t.nav.home}</a>
             <a href="#products" className="hover:text-cyan-400 transition-colors">{t.nav.products}</a>
+            <a href="#reviews" className="hover:text-cyan-400 transition-colors">{t.nav.reviews}</a>
             <a href="#why-us" className="hover:text-cyan-400 transition-colors">{t.nav.whyUs}</a>
             <a href="#faq" className="hover:text-cyan-400 transition-colors">{t.nav.faq}</a>
           </nav>
@@ -185,6 +186,13 @@ export default function Header() {
               className="text-slate-200 hover:text-cyan-400 font-medium py-1.5 border-b border-slate-800/50"
             >
               {t.nav.products}
+            </a>
+            <a
+              href="#reviews"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-slate-200 hover:text-cyan-400 font-medium py-1.5 border-b border-slate-800/50"
+            >
+              {t.nav.reviews}
             </a>
             <a
               href="#why-us"

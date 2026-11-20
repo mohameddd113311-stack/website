@@ -1,6 +1,7 @@
 import React from 'react';
 import Hero from '@/components/Hero';
 import ProductsSection from '@/components/ProductsSection';
+import ReviewsSection from '@/components/ReviewsSection';
 import WhyUs from '@/components/WhyUs';
 import FAQ from '@/components/FAQ';
 import { getProductsAsync } from '@/lib/products';
@@ -18,6 +19,9 @@ export default async function HomePage() {
 
       {/* Products Showcase Section */}
       <ProductsSection initialProducts={products} />
+
+      {/* Customer Reviews & Testimonials Section */}
+      <ReviewsSection />
 
       {/* Why Choose Us */}
       <WhyUs />

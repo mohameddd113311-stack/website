@@ -7,6 +7,7 @@ export const translations = {
     nav: {
       home: 'الرئيسية',
       products: 'الاشتراكات والأسعار',
+      reviews: 'آراء العملاء',
       whyUs: 'لماذا نحن؟',
       faq: 'الأسئلة الشائعة',
       admin: 'الإدارة',
@@ -129,6 +130,7 @@ export const translations = {
     nav: {
       home: 'Home',
       products: 'Subscriptions',
+      reviews: 'Reviews',
       whyUs: 'Why Us?',
       faq: 'FAQ',
       admin: 'Admin',

@@ -64,6 +64,7 @@ export default function Footer() {
             <ul className="space-y-2 text-sm text-slate-400">
               <li><a href="#hero" className="hover:text-cyan-400 transition-colors">{t.nav.home}</a></li>
               <li><a href="#products" className="hover:text-cyan-400 transition-colors">{t.nav.products}</a></li>
+              <li><a href="#reviews" className="hover:text-cyan-400 transition-colors">{t.nav.reviews}</a></li>
               <li><a href="#why-us" className="hover:text-cyan-400 transition-colors">{t.nav.whyUs}</a></li>
               <li><a href="#faq" className="hover:text-cyan-400 transition-colors">{t.nav.faq}</a></li>
             </ul>
