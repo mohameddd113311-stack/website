@@ -237,62 +237,7 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
     errors.push(`Supabase REST save error: ${e?.message || e}`);
   }
 
-  // 2. Secondary: Save to Prisma PostgreSQL (persistent, works on Vercel)
-  if (process.env.DATABASE_URL) {
-    try {
-      const activeIds = products.map(p => p.id);
-      if (activeIds.length > 0) {
-        await prisma.product.deleteMany({
-          where: { id: { notIn: activeIds } },
-        });
-      }
-
-      for (const p of products) {
-        const featuresJson = parseFeatures(p.features);
-        await prisma.product.upsert({
-          where: { id: p.id },
-          update: {
-            name: p.name,
-            category: p.category,
-            price: p.price,
-            originalPrice: p.originalPrice || null,
-            stockQuantity: p.stockQuantity ?? 999,
-            billingPeriod: p.billingPeriod,
-            description: p.description,
-            features: featuresJson,
-            badge: p.badge || null,
-            popular: p.popular || false,
-            imageUrl: p.imageUrl || null,
-            iconType: p.iconType || 'custom',
-            whatsappMsg: p.whatsappMsg || null,
-            active: p.active !== false,
-          },
-          create: {
-            id: p.id,
-            name: p.name,
-            category: p.category,
-            price: p.price,
-            originalPrice: p.originalPrice || null,
-            stockQuantity: p.stockQuantity ?? 999,
-            billingPeriod: p.billingPeriod,
-            description: p.description,
-            features: featuresJson,
-            badge: p.badge || null,
-            popular: p.popular || false,
-            imageUrl: p.imageUrl || null,
-            iconType: p.iconType || 'custom',
-            whatsappMsg: p.whatsappMsg || null,
-            active: p.active !== false,
-          },
-        });
-      }
-      persistentSaveSucceeded = true;
-    } catch (e: any) {
-      errors.push(`Prisma DB save error: ${e?.message || e}`);
-    }
-  }
-
-  // 3. Fallback: Local disk write (only useful in non-serverless environments)
+  // 2. Fallback: Local disk write (only useful in non-serverless environments)
   try {
     ensureDataFilesExist();
     fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), 'utf-8');
@@ -307,11 +252,75 @@ export async function saveProductsPersistent(products: Product[]): Promise<boole
   if (!persistentSaveSucceeded) {
     throw new Error(
       `Failed to save products to any persistent database. ` +
-      `Changes are NOT saved. Errors: ${errors.join('; ') || 'Unknown error - check Supabase anon key and DATABASE_URL'}`
+      `Changes are NOT saved. Errors: ${errors.join('; ') || 'Unknown error - check Supabase key'}`
     );
   }
 
   return true;
+}
+
+/**
+ * Upsert a single product to Supabase directly (fast: ~300ms vs ~4000ms for all products).
+ * Updates in-memory cache immediately.
+ */
+export async function upsertSingleProduct(product: Product): Promise<boolean> {
+  const now = new Date().toISOString();
+  const productWithTimestamp = { ...product, updatedAt: now };
+
+  // Update memory cache immediately
+  if (memoryProducts !== null) {
+    const idx = memoryProducts.findIndex(p => p.id === product.id);
+    if (idx !== -1) {
+      memoryProducts[idx] = productWithTimestamp;
+    } else {
+      memoryProducts = [productWithTimestamp, ...memoryProducts];
+    }
+    lastProductsFetchTime = Date.now();
+  }
+
+  // Save only this one product to Supabase
+  const ok = await saveProductToSupabase(productWithTimestamp);
+  if (!ok) {
+    console.error('upsertSingleProduct: Supabase save failed for', product.id);
+  }
+
+  // Also persist to local file (non-serverless fallback)
+  try {
+    if (memoryProducts) {
+      ensureDataFilesExist();
+      fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(memoryProducts, null, 2), 'utf-8');
+    }
+  } catch {}
+
+  return ok;
+}
+
+/**
+ * Delete a single product from Supabase directly (fast: ~300ms vs ~4000ms for all products).
+ * Updates in-memory cache immediately.
+ */
+export async function deleteSingleProduct(id: string): Promise<boolean> {
+  // Update memory cache immediately
+  if (memoryProducts !== null) {
+    memoryProducts = memoryProducts.filter(p => p.id !== id);
+    lastProductsFetchTime = Date.now();
+  }
+
+  // Delete only this one product from Supabase
+  const ok = await deleteProductFromSupabase(id);
+  if (!ok) {
+    console.error('deleteSingleProduct: Supabase delete failed for', id);
+  }
+
+  // Also persist to local file (non-serverless fallback)
+  try {
+    if (memoryProducts) {
+      ensureDataFilesExist();
+      fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(memoryProducts, null, 2), 'utf-8');
+    }
+  } catch {}
+
+  return ok;
 }
 
 /**

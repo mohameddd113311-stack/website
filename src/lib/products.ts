@@ -330,9 +330,11 @@ import {
   loadProductsAsync,
   saveProductsPersistent,
   invalidateProductsCache,
+  upsertSingleProduct,
+  deleteSingleProduct,
 } from './storage';
 
-export { invalidateProductsCache };
+export { invalidateProductsCache, upsertSingleProduct, deleteSingleProduct };
 
 export function getProducts(): Product[] {
   return loadProductsSync();
@@ -385,7 +387,6 @@ export function addProduct(productData: Omit<Product, 'id' | 'createdAt' | 'upda
 }
 
 export async function addProductAsync(productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {
-  const products = await getProductsAsync();
   const now = new Date().toISOString();
   const newProduct: Product = {
     ...productData,
@@ -393,8 +394,9 @@ export async function addProductAsync(productData: Omit<Product, 'id' | 'created
     createdAt: now,
     updatedAt: now,
   };
-  const updated = [newProduct, ...products];
-  await saveProductsAsync(updated);
+  // Fast: upsert only the new product to Supabase, no need to reload all products
+  const ok = await upsertSingleProduct(newProduct);
+  if (!ok) throw new Error('Failed to save new product to Supabase');
   return newProduct;
 }
 
@@ -416,17 +418,19 @@ export function updateProduct(id: string, productData: Partial<Product>): Produc
 
 export async function updateProductAsync(id: string, productData: Partial<Product>): Promise<Product | null> {
   const products = await getProductsAsync();
-  const index = products.findIndex(p => p.id === id);
-  if (index === -1) return null;
+  const existing = products.find(p => p.id === id);
+  if (!existing) return null;
 
   const now = new Date().toISOString();
-  const updatedProduct = { 
-    ...products[index], 
+  const updatedProduct: Product = {
+    ...existing,
     ...productData,
+    id,
     updatedAt: now,
   };
-  products[index] = updatedProduct;
-  await saveProductsAsync(products);
+  // Fast: upsert only the changed product, not all products
+  const ok = await upsertSingleProduct(updatedProduct);
+  if (!ok) throw new Error('Failed to update product in Supabase');
   return updatedProduct;
 }
 
@@ -439,10 +443,8 @@ export function deleteProduct(id: string): boolean {
 }
 
 export async function deleteProductAsync(id: string): Promise<boolean> {
-  const products = await getProductsAsync();
-  const filtered = products.filter(p => p.id !== id);
-  if (filtered.length === products.length) return false;
-  await saveProductsAsync(filtered);
-  return true;
+  // Fast: delete only this product from Supabase directly
+  const ok = await deleteSingleProduct(id);
+  return ok;
 }
 
